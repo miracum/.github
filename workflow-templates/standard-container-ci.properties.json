@@ -1,0 +1,11 @@
+{
+  "name": "Standard MIRACUM Container Build CI",
+  "description": "Standard MIRACUM container build CI workflow template.",
+  "iconName": "miracum-icon",
+  "categories": [
+      "Container"
+  ],
+  "filePatterns": [
+      "^Dockerfile"
+  ]
+}
