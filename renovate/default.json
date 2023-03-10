@@ -17,6 +17,10 @@
         "matchManagers": ["github-actions"],
         "matchPackageNames": ["slsa-framework/slsa-github-generator"],
         "pinDigests": false
+      },
+      {
+        "matchManagers": ["docker-compose", "dockerfile", "kubernetes"],
+        "groupName": "container-images"
       }
     ]
   }
