@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  release:
+    types: [created]
+  pull_request:
+    branches: [master]
+
+permissions: read-all
+
+jobs:
+  build:
+    uses: ./.github/workflows/standard-build.yaml
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      pull-requests: write
+      actions: read
+      security-events: write
+    with:
+      # can't use the default "ghcr.io/${{ github.repository }}" since
+      # "ghcr.io/miracum/.github:pr-1": invalid reference format"
+      image: ghcr.io/miracum/github-reusable-workflow
+      enable-build-test-layer: true
+      enable-upload-test-image: true
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-without-test-image:
+    uses: ./.github/workflows/standard-build.yaml
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      pull-requests: write
+      actions: read
+      security-events: write
+    with:
+      image: ghcr.io/miracum/github-reusable-workflow
+      enable-build-test-layer: false
+      enable-upload-test-image: false
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  lint:
+    uses: ./.github/workflows/standard-lint.yaml
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      security-events: write
+      actions: read
+    with:
+      codeql-languages: '["python"]'
+      enable-codeql: true
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    runs-on: ubuntu-22.04
+    needs:
+      - build
+    steps:
+      - name: Download build image
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          name: container-image
+          path: /tmp
+
+      - name: Download test image
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          name: test-image
+          path: /tmp
+
+      - name: load image
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          docker load --input /tmp/image.tar
+          docker load --input /tmp/image-test.tar
+
+      - name: load image
+        run: |
+          docker image ls
+
+  release:
+    uses: ./.github/workflows/standard-release.yaml
+    needs:
+      - build
+      - test
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    secrets:
+      semantic-release-token: ${{ secrets.GITHUB_TOKEN }}

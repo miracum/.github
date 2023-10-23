@@ -1,27 +1,26 @@
 {
-    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": [
-      "config:base",
-      ":disableDependencyDashboard",
-      "helpers:pinGitHubActionDigests",
-      "docker:pinDigests",
-      "schedule:monthly",
-      "group:allNonMajor"
-    ],
-    "packageRules": [
-      {
-        "matchManagers": ["github-actions"],
-        "groupName": "github-actions"
-      },
-      {
-        "matchManagers": ["github-actions"],
-        "matchPackageNames": ["slsa-framework/slsa-github-generator"],
-        "pinDigests": false
-      },
-      {
-        "matchManagers": ["docker-compose", "dockerfile", "kubernetes"],
-        "groupName": "container-images"
-      }
-    ]
-  }
-  
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    ":disableDependencyDashboard",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests",
+    "schedule:monthly",
+    "group:allNonMajor"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["slsa-framework/slsa-github-generator"],
+      "pinDigests": false
+    },
+    {
+      "matchManagers": ["docker-compose", "dockerfile", "kubernetes"],
+      "groupName": "container-images"
+    }
+  ]
+}

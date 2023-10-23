@@ -1,0 +1,21 @@
+name: scheduled
+
+on:
+  repository_dispatch: {}
+  workflow_dispatch: {}
+  schedule:
+    - cron: "00 18 * * *"
+
+permissions: read-all
+
+jobs:
+  schedule:
+    uses: ./.github/workflows/standard-schedule.yaml
+    permissions:
+      contents: read
+      issues: write
+      security-events: write
+    with:
+      image: ghcr.io/miracum/github-reusable-workflow
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
