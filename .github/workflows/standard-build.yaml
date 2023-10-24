@@ -34,6 +34,9 @@ on:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
         description: "The built image tags"
+      image-version:
+        value: ${{ jobs.build.outputs.image-version }}
+        description: "The built image version"
       image-meta-json:
         value: ${{ jobs.build.outputs.image-meta-json }}
         description: "The built image meta data in JSON format"
@@ -49,6 +52,9 @@ on:
       test-image-digest:
         value: ${{ jobs.build.outputs.test-image-digest }}
         description: "The test image digest"
+      test-image-version:
+        value: ${{ jobs.build.outputs.test-image-version }}
+        description: "The built image version"
     secrets:
       github-token:
         description: "The GitHub workflow token used to push to ghcr.io. Also used by MegaLinter"
@@ -64,9 +70,11 @@ jobs:
       # for uploading trivy scan results to security tab
       security-events: write
     outputs:
+      image-version: ${{ steps.image_meta.outputs.version }}
       image-tags: ${{ steps.image_meta.outputs.tags }}
       image-meta-json: ${{ steps.image_meta.outputs.json }}
       image-digest: ${{ steps.build.outputs.digest }}
+      test-image-version: ${{ steps.tests_image_meta.outputs.version }}
       test-image-tags: ${{ steps.tests_image_meta.outputs.tags }}
       test-image-meta-json: ${{ steps.tests_image_meta.outputs.json }}
       test-image-digest: ${{ steps.build_test.outputs.digest }}
