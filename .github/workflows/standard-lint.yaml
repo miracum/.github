@@ -91,7 +91,7 @@ jobs:
   codeql-analyze:
     name: CodeQL analyze
     runs-on: ubuntu-22.04
-    if: ${{ github.event_name == 'pull_request' && inputs.enable-codeql }}
+    if: ${{ inputs.enable-codeql }}
     permissions:
       actions: read
       contents: read
