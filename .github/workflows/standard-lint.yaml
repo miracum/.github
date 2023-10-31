@@ -40,6 +40,11 @@ on:
         required: false
         default: "keyless@distroless.iam.gserviceaccount.com"
         type: string
+      java-version:
+        description: "The Java version to use by the CodeQL action"
+        required: false
+        default: "17"
+        type: string 
     secrets:
       github-token:
         description: "The GitHub workflow token used to push to ghcr.io. Also used by MegaLinter"
@@ -104,7 +109,7 @@ jobs:
         uses: gradle/wrapper-validation-action@56b90f209b02bf6d1deae490e9ef18b21a389cd4 # v1.1.0
 
   base-image-signature-verification:
-    name: validate Dockerfile base image signature
+    name: verify Dockerfile base image signature
     runs-on: ubuntu-22.04
     if: ${{ inputs.enable-verify-base-image-signature }}
     permissions:
@@ -144,7 +149,7 @@ jobs:
         if: ${{ matrix.language == 'java' }}
         uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0 # v3.13.0
         with:
-          java-version: "17"
+          java-version: ${{ inputs.java-version }}
           distribution: "temurin"
           cache: gradle
 
