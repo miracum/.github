@@ -15,6 +15,11 @@ on:
         required: false
         default: "ghcr.io/${{ github.repository }}"
         type: string
+      image-tag:
+        description: "The image tag to scan with trivy"
+        required: false
+        default: "latest"
+        type: string
     secrets:
       github-token:
         description: "The GitHub workflow token used to push to ghcr.io. Also used by MegaLinter"
@@ -71,7 +76,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@f78e9ecf42a1271402d4f484518b9313235990e1 # 0.13.1
         with:
-          image-ref: "${{ inputs.image }}:latest"
+          image-ref: "${{ inputs.image }}:${{ inputs.image-tag }}"
           format: "template"
           template: "@/contrib/sarif.tpl"
           output: "trivy-results.sarif"
