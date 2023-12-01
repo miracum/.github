@@ -52,7 +52,7 @@ jobs:
 
       - name: Look for an existing issue
         id: last-issue
-        uses: micalevisk/last-issue-action@305829d9728f47beb0029417167a0af890edfd6e # v2.1.0
+        uses: micalevisk/last-issue-action@f5661581217cc78cc282d1351aa65bd8bd155003 # v2.2.1
         with:
           state: open
           labels: lychee link check
@@ -74,7 +74,7 @@ jobs:
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
     steps:
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@f78e9ecf42a1271402d4f484518b9313235990e1 # 0.13.1
+        uses: aquasecurity/trivy-action@2b6a709cf9c4025c5438138008beaddbb02086f0 # 0.14.0
         with:
           image-ref: "${{ inputs.image }}:${{ inputs.image-tag }}"
           format: "template"
@@ -83,6 +83,6 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@74483a38d39275f33fcff5f35b679b5ca4a26a99 # v2.22.5
+        uses: github/codeql-action/upload-sarif@407ffafae6a767df3e0230c3df91b6443ae8df75 # v2.22.8
         with:
           sarif_file: "trivy-results.sarif"
