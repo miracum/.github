@@ -3,6 +3,10 @@ name: scheduled
 on:
   repository_dispatch: {}
   workflow_dispatch: {}
+  # only to test the workflow as part of PRs
+  pull_request:
+    branches:
+      - master
   schedule:
     - cron: "00 18 * * *"
 
@@ -16,7 +20,6 @@ jobs:
       issues: write
       security-events: write
     with:
-      image: ghcr.io/miracum/github-reusable-workflow
-      image-tag: master
+      images: "['ghcr.io/miracum/github-reusable-workflow:master', 'ghcr.io/miracum/github-reusable-workflow:master']"
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}

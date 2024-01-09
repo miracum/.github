@@ -10,16 +10,11 @@ defaults:
 on:
   workflow_call:
     inputs:
-      image:
-        description: "Name of the image to scan with trivy"
+      images:
+        description: "List of container images to scan with trivy"
         required: false
-        default: "ghcr.io/${{ github.repository }}"
         type: string
-      image-tag:
-        description: "The image tag to scan with trivy"
-        required: false
-        default: "latest"
-        type: string
+        default: "['ghcr.io/${{ github.repository }}:latest']"
     secrets:
       github-token:
         description: "The GitHub workflow token used to push to ghcr.io. Also used by MegaLinter"
@@ -67,8 +62,11 @@ jobs:
           labels: report, automated issue, lychee link check
 
   trivy-scan:
-    name: scan latest image with trivy
+    name: scan images with trivy
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        image: ${{ fromJSON(inputs.images) }}
     permissions:
       contents: read # for actions/checkout to fetch code
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
@@ -76,7 +74,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@2b6a709cf9c4025c5438138008beaddbb02086f0 # 0.14.0
         with:
-          image-ref: "${{ inputs.image }}:${{ inputs.image-tag }}"
+          image-ref: "${{ matrix.image }}"
           format: "template"
           template: "@/contrib/sarif.tpl"
           output: "trivy-results.sarif"
