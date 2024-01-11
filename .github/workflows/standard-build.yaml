@@ -92,7 +92,7 @@ jobs:
 
       - name: Container image meta
         id: image_meta
-        uses: docker/metadata-action@e6428a5c4e294a61438ed7f43155db912025b6b3 # v5
+        uses: docker/metadata-action@dbef88086f6cef02e264edb7dbf63250c17cef6c # v5
         with:
           images: |
             ${{ inputs.image }}
@@ -100,7 +100,7 @@ jobs:
       - name: Container meta for the test image
         id: tests_image_meta
         if: ${{ inputs.enable-build-test-layer == true }}
-        uses: docker/metadata-action@e6428a5c4e294a61438ed7f43155db912025b6b3 # v5
+        uses: docker/metadata-action@dbef88086f6cef02e264edb7dbf63250c17cef6c # v5
         with:
           images: |
             ${{ inputs.image }}-test
@@ -176,7 +176,7 @@ jobs:
             /tmp/image.tar
 
       - name: Save Trivy vulnerability attestation
-        uses: aquasecurity/trivy-action@2b6a709cf9c4025c5438138008beaddbb02086f0 # 0.14.0
+        uses: aquasecurity/trivy-action@d43c1f16c00cfd3978dde6c07f4bbcf9eb6993ca # 0.16.1
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -191,7 +191,7 @@ jobs:
             trivy-vuln-attestation.json
 
       - name: Run Trivy vulnerability scanner for GitHub Security tab
-        uses: aquasecurity/trivy-action@2b6a709cf9c4025c5438138008beaddbb02086f0 # 0.14.0
+        uses: aquasecurity/trivy-action@d43c1f16c00cfd3978dde6c07f4bbcf9eb6993ca # 0.16.1
         if: ${{ github.event_name != 'pull_request' }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
@@ -200,7 +200,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@407ffafae6a767df3e0230c3df91b6443ae8df75 # v2.22.8
+        uses: github/codeql-action/upload-sarif@8b7fcbfac2aae0e6c24d9f9ebd5830b1290b18e4 # v2.23.0
         if: ${{ github.event_name != 'pull_request' }}
         with:
           sarif_file: "trivy-results.sarif"
@@ -256,7 +256,7 @@ jobs:
           path: /tmp
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@1fc5bd396d372bee37d608f955b336615edf79c8 # v3.2.0
+        uses: sigstore/cosign-installer@9614fae9e5c5eddabb09f90a270fcb487c9f7149 # v3.3.0
 
       - name: Sign image
         env:
