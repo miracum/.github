@@ -152,7 +152,7 @@ jobs:
 
       - name: Upload test image
         if: ${{ (inputs.enable-build-test-layer == true) && (inputs.enable-upload-test-image == true) }}
-        uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
         with:
           name: ${{ steps.slugify-image.outputs.slug }}-test
           path: |
@@ -181,7 +181,7 @@ jobs:
 
       - name: Upload container image
         if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image == true }}
-        uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
         with:
           name: ${{ steps.slugify-image.outputs.slug }}
           path: |
@@ -196,7 +196,7 @@ jobs:
           output: trivy-vuln-attestation.json
 
       - name: Upload image vulnerability attestation
-        uses: actions/upload-artifact@694cdabd8bdb0f10b2cea11669e1bf5453eed0a6 # v4.2.0
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
         with:
           name: ${{ steps.slugify-image.outputs.slug }}-trivy-attestation
           path: |
