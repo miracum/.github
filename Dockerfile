@@ -5,6 +5,6 @@ COPY src/hello_world.py .
 FROM base AS test
 RUN echo "Hello test"
 
-FROM gcr.io/distroless/python3-debian12:nonroot@sha256:02c3a74bee78c927ab39dd739f0e56e36675e6adc9032208abb7ed8b83067c74
+FROM gcr.io/distroless/python3-debian12:nonroot@sha256:5c7661ddc1f43e50ee97404b12146d34ac34afc9ab7e713c3bac189efb074e10
 USER 65532:65532
 CMD [ "python", "/app/hello_world.py" ]
