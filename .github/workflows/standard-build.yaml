@@ -189,6 +189,8 @@ jobs:
 
       - name: Save Trivy vulnerability attestation
         uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef # 0.17.0
+        env:
+          TMPDIR: ${{ runner.temp }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -205,6 +207,8 @@ jobs:
       - name: Run Trivy vulnerability scanner for GitHub Security tab
         uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef # 0.17.0
         if: ${{ github.event_name != 'pull_request' }}
+        env:
+          TMPDIR: ${{ runner.temp }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
