@@ -192,7 +192,7 @@ jobs:
           ls -lsa /home/runner
           ls -lsa ${{ runner.temp }}
           docker image ls
-          docker volumes ls
+          docker volume ls
           docker system df
 
       - name: Save Trivy vulnerability attestation
