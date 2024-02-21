@@ -191,6 +191,9 @@ jobs:
           mkdir -p ${{ runner.temp }}
           ls -lsa /home/runner
           ls -lsa ${{ runner.temp }}
+          docker image ls
+          docker volumes ls
+          docker system df
 
       - name: Save Trivy vulnerability attestation
         uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef # 0.17.0
