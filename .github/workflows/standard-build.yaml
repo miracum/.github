@@ -90,9 +90,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          # via <https://stackoverflow.com/questions/74744498/github-pushing-to-protected-branches-with-fine-grained-token/76550826#76550826>
-          persist-credentials: false
 
       - name: Container image meta
         id: image_meta
@@ -186,6 +183,12 @@ jobs:
           name: ${{ steps.slugify-image.outputs.slug }}
           path: |
             /tmp/image.tar
+      
+      - name: check FS size
+        run: |
+          ls -lsa /tmp
+          df -h
+          mkdir -p ${{ runner.temp }}
 
       - name: Save Trivy vulnerability attestation
         uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef # 0.17.0
