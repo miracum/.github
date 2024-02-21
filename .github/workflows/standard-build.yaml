@@ -183,7 +183,7 @@ jobs:
           name: ${{ steps.slugify-image.outputs.slug }}
           path: |
             /tmp/image.tar
-      
+
       - name: Print docker usage
         run: |
           ls -lsa /tmp
