@@ -107,7 +107,7 @@ jobs:
             ${{ inputs.image }}-test
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@0d103c3126aa41d772a8362f6aa67afac040f80c # v3
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
@@ -190,7 +190,7 @@ jobs:
           docker system df
 
       - name: Save Trivy vulnerability attestation
-        uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef # 0.17.0
+        uses: aquasecurity/trivy-action@062f2592684a31eb3aa050cc61e7ca1451cecd3d # 0.18.0
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -205,7 +205,7 @@ jobs:
             trivy-vuln-attestation.json
 
       - name: Run Trivy vulnerability scanner for GitHub Security tab
-        uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef # 0.17.0
+        uses: aquasecurity/trivy-action@062f2592684a31eb3aa050cc61e7ca1451cecd3d # 0.18.0
         if: ${{ github.event_name != 'pull_request' }}
         env:
           TMPDIR: ${{ runner.temp }}
@@ -216,7 +216,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@e8893c57a1f3a2b659b6b55564fdfdbbd2982911 # v3.24.0
+        uses: github/codeql-action/upload-sarif@8a470fddafa5cbb6266ee11b37ef4d8aae19c571 # v3.24.6
         if: ${{ github.event_name != 'pull_request' }}
         with:
           sarif_file: "trivy-results.sarif"
@@ -266,7 +266,7 @@ jobs:
           password: ${{ secrets.github-token }}
 
       - name: Download attestations
-        uses: actions/download-artifact@eaceaf801fd36c7dee90939fad912460b18a1ffe # v4.1.2
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
         with:
           name: ${{ needs.build.outputs.image-slug }}-trivy-attestation
           path: /tmp
