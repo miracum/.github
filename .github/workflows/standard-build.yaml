@@ -223,7 +223,7 @@ jobs:
 
       - name: Download PR comment template
         run: |
-          curl -o trivy-pr-report.md.tpl https://raw.githubusercontent.com/aquasecurity/trivy/7735ec432a83d5446d13a593ab3b27dd02649ca1/contrib/markdown.tpl
+          curl -o trivy-pr-report.md.tpl https://raw.githubusercontent.com/miracum/.github/master/.github/trivy-pr-report.md.tpl
 
       - name: Run Trivy vulnerability scanner for PR comment
         uses: aquasecurity/trivy-action@062f2592684a31eb3aa050cc61e7ca1451cecd3d # 0.18.0
