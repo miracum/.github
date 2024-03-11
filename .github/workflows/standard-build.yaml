@@ -77,6 +77,8 @@ jobs:
       packages: write
       # for uploading trivy scan results to security tab
       security-events: write
+      # for the trivy PR comment
+      pull-requests: write
     outputs:
       image-version: ${{ steps.image_meta.outputs.version }}
       image-tags: ${{ steps.image_meta.outputs.tags }}
@@ -207,8 +209,6 @@ jobs:
       - name: Run Trivy vulnerability scanner for GitHub Security tab
         uses: aquasecurity/trivy-action@062f2592684a31eb3aa050cc61e7ca1451cecd3d # 0.18.0
         if: ${{ github.event_name != 'pull_request' }}
-        env:
-          TMPDIR: ${{ runner.temp }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -220,6 +220,28 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         with:
           sarif_file: "trivy-results.sarif"
+
+      - name: Download PR comment template
+        run: |
+          curl -o trivy-pr-report.md.tpl https://raw.githubusercontent.com/aquasecurity/trivy/7735ec432a83d5446d13a593ab3b27dd02649ca1/contrib/markdown.tpl
+
+      - name: Run Trivy vulnerability scanner for PR comment
+        uses: aquasecurity/trivy-action@062f2592684a31eb3aa050cc61e7ca1451cecd3d # 0.18.0
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          exit-code: "0"
+          format: "template"
+          template: "@trivy-pr-report.md.tpl"
+          output: "trivy-pr-report.md"
+
+      - name: Add trivy report PR comment
+        uses: marocchino/sticky-pull-request-comment@331f8f5b4215f0445d3c07b4967662a32a2d3e31 # v2.9.0
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          recreate: true
+          header: "trivy-report-comment-${{ steps.slugify-image.outputs.slug }}"
+          path: trivy-pr-report.md
 
     # requires content: write access
     #   - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
