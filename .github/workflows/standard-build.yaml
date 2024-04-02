@@ -35,6 +35,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable-trivy-scan:
+        description: "If enabled, scan the image using trivy and publish a signed attestation"
+        required: false
+        default: true
+        type: boolean
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
@@ -193,6 +198,7 @@ jobs:
 
       - name: Save Trivy vulnerability attestation
         uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # 0.19.0
+        if: ${{ inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -201,6 +207,7 @@ jobs:
 
       - name: Upload image vulnerability attestation
         uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        if: ${{ inputs.enable-trivy-scan }}
         with:
           name: ${{ steps.slugify-image.outputs.slug }}-trivy-attestation
           path: |
@@ -208,7 +215,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner for GitHub Security tab
         uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # 0.19.0
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -217,17 +224,18 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@1b1aada464948af03b950897e5eb522f92603cc2 # v3.24.9
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: Download PR comment template
+        if: ${{ inputs.enable-trivy-scan }}
         run: |
           curl -o trivy-pr-report.md.tpl https://raw.githubusercontent.com/miracum/.github/master/.github/trivy-pr-report.md.tpl
 
       - name: Run Trivy vulnerability scanner for PR comment
         uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # 0.19.0
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
@@ -237,7 +245,7 @@ jobs:
 
       - name: Add trivy report PR comment
         uses: marocchino/sticky-pull-request-comment@331f8f5b4215f0445d3c07b4967662a32a2d3e31 # v2.9.0
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
           recreate: true
           header: "trivy-report-comment-${{ steps.slugify-image.outputs.slug }}"
