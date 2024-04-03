@@ -295,12 +295,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.github-token }}
 
-      - name: Download attestations
-        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
-        with:
-          name: ${{ needs.build.outputs.image-slug }}-trivy-attestation
-          path: /tmp
-
       - name: Install Cosign
         uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # v3.4.0
 
@@ -310,6 +304,30 @@ jobs:
         run: |
           echo "Signing '$IMAGE' using keyless approach"
           cosign sign --yes "${IMAGE}"
+
+  attest-trivy-vulnerability-report:
+    name: attest trivy vulnerability report
+    runs-on: ubuntu-22.04
+    if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
+    needs:
+      - build
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.github-token }}
+
+      - name: Download attestations
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        with:
+          name: ${{ needs.build.outputs.image-slug }}-trivy-attestation
+          path: /tmp
 
       - name: Attest image vulnerability report
         env:
