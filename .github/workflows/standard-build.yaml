@@ -329,6 +329,9 @@ jobs:
           name: ${{ needs.build.outputs.image-slug }}-trivy-attestation
           path: /tmp
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # v3.4.0
+
       - name: Attest image vulnerability report
         env:
           IMAGE: "${{ inputs.image }}@${{ needs.build.outputs.image-digest }}"
