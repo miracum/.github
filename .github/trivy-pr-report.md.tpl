@@ -26,6 +26,7 @@
     </table>
 </details>
 {{- end }}
+
 {{- if (eq (len .Misconfigurations ) 0) }}
 <h4>No Misconfigurations found</h4>
 {{- else }}
