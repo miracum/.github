@@ -5,50 +5,71 @@
 <h4>No Vulnerabilities found</h4>
 {{- else }}
 <h4>Vulnerabilities ({{ len .Vulnerabilities }})</h4>
-<table>
-    <tr>
-        <th>Package</th>
-        <th>ID</th>
-        <th>Severity</th>
-        <th>Installed Version</th>
-        <th>Fixed Version</th>
-    </tr>
-    {{- range .Vulnerabilities }}
-    <tr>
-        <td><code>{{ escapeXML .PkgName }}</code></td>
-        <td>{{ escapeXML .VulnerabilityID }}</td>
-        <td>{{ escapeXML .Severity }}</td>
-        <td>{{ escapeXML .InstalledVersion }}</td>
-        <td>{{ escapeXML .FixedVersion }}</td>
-    </tr>
-    {{- end }}
-</table>
+{{- $critical := 0 }}
+{{- $high := 0 }}
+{{- range . }}
+{{- range .Vulnerabilities }}
+{{- if  eq .Severity "CRITICAL" }}
+{{- $critical = add $critical 1 }}
+{{- end }}
+{{- if  eq .Severity "HIGH" }}
+{{- $high = add $high 1 }}
+{{- end }}
+{{- end }}
+{{- end }}
+<p>
+Critical: {{ $critical }}, High: {{ $high }}
+</p>
+<details>
+    <summary>Show detailed table of vulnerabilities</summary>
+    <table>
+        <tr>
+            <th>Package</th>
+            <th>ID</th>
+            <th>Severity</th>
+            <th>Installed Version</th>
+            <th>Fixed Version</th>
+        </tr>
+        {{- range .Vulnerabilities }}
+        <tr>
+            <td><code>{{ escapeXML .PkgName }}</code></td>
+            <td>{{ escapeXML .VulnerabilityID }}</td>
+            <td>{{ escapeXML .Severity }}</td>
+            <td>{{ escapeXML .InstalledVersion }}</td>
+            <td>{{ escapeXML .FixedVersion }}</td>
+        </tr>
+        {{- end }}
+    </table>
+</details>
 {{- end }}
 {{- if (eq (len .Misconfigurations ) 0) }}
 <h4>No Misconfigurations found</h4>
 {{- else }}
 <h4>Misconfigurations</h4>
-<table>
-    <tr>
-        <th>Type</th>
-        <th>ID</th>
-        <th>Check</th>
-        <th>Severity</th>
-        <th>Message</th>
-    </tr>
-    {{- range .Misconfigurations }}
-    <tr>
-        <td>{{ escapeXML .Type }}</td>
-        <td>{{ escapeXML .ID }}</td>
-        <td>{{ escapeXML .Title }}</td>
-        <td>{{ escapeXML .Severity }}</td>
-        <td>
-          {{ escapeXML .Message }}
-          <br><a href={{ escapeXML .PrimaryURL | printf "%q" }}>{{ escapeXML .PrimaryURL }}</a></br>
-        </td>
-    </tr>
-    {{- end }}
-</table>
+<details>
+    <summary>Show detailed table of misconfigurations</summary>
+    <table>
+        <tr>
+            <th>Type</th>
+            <th>ID</th>
+            <th>Check</th>
+            <th>Severity</th>
+            <th>Message</th>
+        </tr>
+        {{- range .Misconfigurations }}
+        <tr>
+            <td>{{ escapeXML .Type }}</td>
+            <td>{{ escapeXML .ID }}</td>
+            <td>{{ escapeXML .Title }}</td>
+            <td>{{ escapeXML .Severity }}</td>
+            <td>
+            {{ escapeXML .Message }}
+            <br><a href={{ escapeXML .PrimaryURL | printf "%q" }}>{{ escapeXML .PrimaryURL }}</a></br>
+            </td>
+        </tr>
+        {{- end }}
+    </table>
+</details>
 {{- end }}
 {{- end }}
 {{- else }}
