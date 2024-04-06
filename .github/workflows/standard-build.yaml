@@ -40,6 +40,11 @@ on:
         required: false
         default: true
         type: boolean
+      image-tags:
+        description: "If set, overwrite the default image tags. See <https://github.com/docker/metadata-action?tab=readme-ov-file#tags-input> for the format and usage."
+        required: false
+        default: ""
+        type: string
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
@@ -104,6 +109,8 @@ jobs:
         with:
           images: |
             ${{ inputs.image }}
+          tags: |
+            ${{ inputs.image-tags }}
 
       - name: Container meta for the test image
         id: tests_image_meta
