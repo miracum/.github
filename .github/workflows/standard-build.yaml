@@ -43,7 +43,7 @@ on:
       image-tags:
         description: "If set, overwrite the default image tags. See <https://github.com/docker/metadata-action?tab=readme-ov-file#tags-input> for the format and usage."
         required: false
-        default: ""
+        default: ~
         type: boolean
     outputs:
       image-tags:
