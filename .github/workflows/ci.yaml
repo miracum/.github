@@ -45,6 +45,24 @@ jobs:
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  build-with-fixed-image-tags:
+    uses: ./.github/workflows/standard-build.yaml
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      pull-requests: write
+      actions: read
+      security-events: write
+    with:
+      image: ghcr.io/miracum/github-reusable-workflow-without-test-image
+      enable-build-test-layer: false
+      enable-upload-test-image: false
+      image-tags: |
+        type=semver,pattern={{raw}},value=v1.2.3-beta.123
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
   lint:
     uses: ./.github/workflows/standard-lint.yaml
     permissions:
