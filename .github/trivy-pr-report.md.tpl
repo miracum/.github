@@ -4,22 +4,6 @@
 {{- if (eq (len .Vulnerabilities) 0) }}
 <h4>No Vulnerabilities found</h4>
 {{- else }}
-<h4>Vulnerabilities ({{ len .Vulnerabilities }})</h4>
-{{- $critical := 0 }}
-{{- $high := 0 }}
-{{- range . }}
-{{- range .Vulnerabilities }}
-{{- if  eq .Severity "CRITICAL" }}
-{{- $critical = add $critical 1 }}
-{{- end }}
-{{- if  eq .Severity "HIGH" }}
-{{- $high = add $high 1 }}
-{{- end }}
-{{- end }}
-{{- end }}
-<p>
-Critical: {{ $critical }}, High: {{ $high }}
-</p>
 <details>
     <summary>Show detailed table of vulnerabilities</summary>
     <table>
