@@ -1,9 +1,34 @@
+<h2> Trivy image scan report</h2>
 {{- if . }}
 {{- range . }}
-<h3>Target <code>{{ escapeXML .Target }}</code></h3>
+<h3><code>{{ escapeXML .Target }}</code></h3>
 {{- if (eq (len .Vulnerabilities) 0) }}
 <h4>No Vulnerabilities found</h4>
 {{- else }}
+{{ $countBySeverity := dict "CRITICAL" 0 "HIGH" 0 "MEDIUM" 0 "LOW" 0 }}
+{{- range .Vulnerabilities }}
+    {{- if eq .Severity "CRITICAL" }}
+        {{ $currentCount := get $countBySeverity "CRITICAL" }}
+        {{ $_ := set $countBySeverity "CRITICAL" (add1 $currentCount) }}
+    {{- else if eq .Severity "HIGH" }}
+        {{ $currentCount := get $countBySeverity "HIGH" }}
+        {{ $_ := set $countBySeverity "HIGH" (add1 $currentCount) }}
+    {{- else if eq .Severity "MEDIUM" }}
+        {{ $currentCount := get $countBySeverity "MEDIUM" }}
+        {{ $_ := set $countBySeverity "MEDIUM" (add1 $currentCount) }}
+    {{- else if eq .Severity "LOW" }}
+        {{ $currentCount := get $countBySeverity "LOW" }}
+        {{ $_ := set $countBySeverity "LOW" (add1 $currentCount) }}
+    {{- end }}
+{{- end }}
+
+{{ $vulnerabilityCountsFormatted := "" }}
+{{- range (keys $countBySeverity) }}
+{{ $vulnerabilityCountsFormatted = printf "%s %s: %d" ($vulnerabilityCountsFormatted | trim) . (get $countBySeverity .) }}
+{{- end }}
+
+<h4>{{ (len .Vulnerabilities) }} known vulnerabilities found ({{ $vulnerabilityCountsFormatted }})</h4>
+
 <details>
     <summary>Show detailed table of vulnerabilities</summary>
     <table>
