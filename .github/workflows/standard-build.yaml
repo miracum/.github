@@ -101,7 +101,7 @@ jobs:
       image-slug: ${{ steps.slugify-image.outputs.slug }}
     steps:
       - name: Checkout
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
       - name: Container image meta
         id: image_meta
@@ -124,7 +124,7 @@ jobs:
         uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+        uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           registry: ghcr.io
@@ -204,7 +204,7 @@ jobs:
           docker system df
 
       - name: Save Trivy vulnerability attestation
-        uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # 0.19.0
+        uses: aquasecurity/trivy-action@fd25fed6972e341ff0007ddb61f77e88103953c2 # 0.21.0
         if: ${{ inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
@@ -221,7 +221,7 @@ jobs:
             trivy-vuln-attestation.json
 
       - name: Run Trivy vulnerability scanner for GitHub Security tab
-        uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # 0.19.0
+        uses: aquasecurity/trivy-action@fd25fed6972e341ff0007ddb61f77e88103953c2 # 0.21.0
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
@@ -230,7 +230,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@d39d31e687223d841ef683f52467bd88e9b21c14 # v3.25.3
+        uses: github/codeql-action/upload-sarif@9fdb3e49720b44c48891d036bb502feb25684276 # v3.25.6
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           sarif_file: "trivy-results.sarif"
@@ -241,7 +241,7 @@ jobs:
           curl -o trivy-pr-report.md.tpl https://raw.githubusercontent.com/miracum/.github/master/.github/trivy-pr-report.md.tpl
 
       - name: Run Trivy vulnerability scanner for PR comment
-        uses: aquasecurity/trivy-action@d710430a6722f083d3b36b8339ff66b32f22ee55 # 0.19.0
+        uses: aquasecurity/trivy-action@fd25fed6972e341ff0007ddb61f77e88103953c2 # 0.21.0
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
@@ -296,7 +296,7 @@ jobs:
       packages: write
     steps:
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+        uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -324,7 +324,7 @@ jobs:
       packages: write
     steps:
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+        uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
