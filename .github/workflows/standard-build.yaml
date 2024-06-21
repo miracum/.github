@@ -209,7 +209,7 @@ jobs:
           docker system df
 
       - name: Save Trivy vulnerability attestation
-        uses: aquasecurity/trivy-action@595be6a0f6560a0a8fc419ddf630567fc623531d # 0.22.0
+        uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
@@ -226,7 +226,7 @@ jobs:
             trivy-vuln-attestation.json
 
       - name: Run Trivy vulnerability scanner for GitHub Security tab
-        uses: aquasecurity/trivy-action@595be6a0f6560a0a8fc419ddf630567fc623531d # 0.22.0
+        uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
@@ -235,7 +235,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@530d4feaa9c62aaab2d250371e2061eb7a172363 # v3.25.9
+        uses: github/codeql-action/upload-sarif@23acc5c183826b7a8a97bce3cecc52db901f8251 # v3.25.10
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           sarif_file: "trivy-results.sarif"
@@ -246,7 +246,7 @@ jobs:
           curl -o trivy-pr-report.md.tpl https://raw.githubusercontent.com/miracum/.github/master/.github/trivy-pr-report.md.tpl
 
       - name: Run Trivy vulnerability scanner for PR comment
-        uses: aquasecurity/trivy-action@595be6a0f6560a0a8fc419ddf630567fc623531d # 0.22.0
+        uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
           image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
