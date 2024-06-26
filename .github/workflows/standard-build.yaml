@@ -40,6 +40,11 @@ on:
         required: false
         default: true
         type: boolean
+      trivy-ignore-unfixed:
+        description: "Ignore unfixed/unfixable vulnerabilities in reports"
+        required: false
+        default: true
+        type: boolean
       image-tags:
         description: "If set, overwrite the default image tags. See <https://github.com/docker/metadata-action?tab=readme-ov-file#tags-input> for the format and usage."
         required: false
@@ -216,6 +221,7 @@ jobs:
           exit-code: "0"
           format: cosign-vuln
           output: trivy-vuln-attestation.json
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Upload image vulnerability attestation
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
@@ -233,6 +239,7 @@ jobs:
           exit-code: "0"
           format: "sarif"
           output: "trivy-results.sarif"
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@23acc5c183826b7a8a97bce3cecc52db901f8251 # v3.25.10
@@ -254,6 +261,7 @@ jobs:
           format: "template"
           template: "@trivy-pr-report.md.tpl"
           output: "trivy-pr-report.md"
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Add trivy report PR comment
         uses: marocchino/sticky-pull-request-comment@331f8f5b4215f0445d3c07b4967662a32a2d3e31 # v2.9.0
