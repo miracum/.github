@@ -145,7 +145,7 @@ jobs:
       - name: Build unit test image layer
         if: ${{ inputs.enable-build-test-layer == true }}
         id: build_test
-        uses: docker/build-push-action@31159d49c0d4756269a0940a750801a1ea5d7003 # v6
+        uses: docker/build-push-action@15560696de535e4014efeff63c48f16952e52dd1 # v6
         with:
           context: ${{ inputs.build-context }}
           push: false
@@ -181,7 +181,7 @@ jobs:
 
       - name: Build and push image
         id: build
-        uses: docker/build-push-action@31159d49c0d4756269a0940a750801a1ea5d7003 # v6
+        uses: docker/build-push-action@15560696de535e4014efeff63c48f16952e52dd1 # v6
         with:
           context: ${{ inputs.build-context }}
           # when in a PR, load the image into the local docker daemon
@@ -242,7 +242,7 @@ jobs:
           ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@23acc5c183826b7a8a97bce3cecc52db901f8251 # v3.25.10
+        uses: github/codeql-action/upload-sarif@b611370bb5703a7efb587f9d136a52ea24c5c38c # v3.25.11
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           sarif_file: "trivy-results.sarif"
