@@ -162,7 +162,9 @@ jobs:
           # instead, we use the explicit output specification below.
           # see <https://github.com/concourse/oci-build-task/issues/85#issuecomment-2092798670>
           # load: true
-          outputs: type=oci,dest=${{ github.workspace }}/image-test.tar
+          outputs: |
+            type=oci,dest=${{ github.workspace }}/image-test.tar
+            type=image
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
           cache-from: type=gha
