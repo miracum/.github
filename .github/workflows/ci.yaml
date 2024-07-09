@@ -99,21 +99,15 @@ jobs:
 
       - name: ls
         run: |
-          echo "${{ needs.build.outputs.image-tags }}"
           ls -lsa /tmp
 
-      - name: Install regctl
-        uses: regclient/actions/regctl-installer@35bc5829dd3d37ace2717971f3151894b43bfabc
-
-      # this could work with plain docker using containerd storage, see
-      # <https://docs.docker.com/reference/cli/docker/buildx/build/#output>
       - name: load image
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          regctl image import "${{ needs.build.outputs.image-tags }}" /tmp/image.tar
-          regctl image import "${{ needs.build.outputs.test-image-tags }}" /tmp/image-test.tar
+          docker load --input /tmp/image.tar
+          docker load --input /tmp/image-test.tar
 
-      - name: load image
+      - name: list images
         run: |
           docker image ls
 

@@ -169,13 +169,8 @@ jobs:
         with:
           context: ${{ inputs.build-context }}
           push: false
-          # Load is a shorthand for --output=type=docker (default false)
-          # instead, we use the explicit output specification below.
-          # see <https://github.com/concourse/oci-build-task/issues/85#issuecomment-2092798670>
           load: true
-          # outputs: |
-          #   type=oci,dest=${{ github.workspace }}/image-test.tar
-          #   type=image
+          outputs: type=oci,dest=./image-test.tar
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
           cache-from: type=gha
@@ -210,7 +205,7 @@ jobs:
           # the registry
           load: ${{ github.event_name == 'pull_request' }}
           push: ${{ github.event_name != 'pull_request' }}
-          # outputs: ${{ github.event_name == 'pull_request' && 'type=oci,dest=./image.tar type=image' || 'type=oci,dest=./image.tar type=registry' }}
+          outputs: type=oci,dest=./image.tar
           sbom: ${{ github.event_name != 'pull_request' }}
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
@@ -243,8 +238,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ inputs.enable-trivy-scan }}
         with:
-          input: /github/workspace/__trivy_scan/image
-          scan-type: image
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
           format: cosign-vuln
           output: trivy-vuln-attestation.json
@@ -262,8 +256,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
-          input: /github/workspace/__trivy_scan/image
-          scan-type: image
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
           format: "sarif"
           output: "trivy-results.sarif"
@@ -284,8 +277,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
-          input: /github/workspace/__trivy_scan/image
-          scan-type: image
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           exit-code: "0"
           format: "template"
           template: "@trivy-pr-report.md.tpl"
