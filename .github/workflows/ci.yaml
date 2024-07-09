@@ -101,11 +101,14 @@ jobs:
         run: |
           ls -lsa /tmp
 
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@35bc5829dd3d37ace2717971f3151894b43bfabc
+
       - name: load image
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          docker load --input /tmp/image.tar
-          docker load --input /tmp/image-test.tar
+          regctl image import "${{ needs.build.outputs.image-tags[0] }}" /tmp/image.tar
+          regctl image import "${{ needs.build.outputs.test-image-tags[0] }}" /tmp/image-test.tar
 
       - name: load image
         run: |
