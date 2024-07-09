@@ -214,7 +214,7 @@ jobs:
       
       - name: display images
         run: |
-          ls -lsaR /tmp
+          ls -lsa /tmp
           docker image ls -a
 
       - name: Save Trivy vulnerability attestation
