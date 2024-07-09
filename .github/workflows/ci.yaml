@@ -56,8 +56,8 @@ jobs:
       security-events: write
     with:
       image: ghcr.io/miracum/github-reusable-workflow-without-test-image
-      enable-build-test-layer: false
-      enable-upload-test-image: false
+      enable-build-test-layer: true
+      enable-upload-test-image: true
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
       platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
