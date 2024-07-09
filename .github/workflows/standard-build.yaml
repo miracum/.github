@@ -217,11 +217,18 @@ jobs:
           ls -lsa ${{ github.workspace }}
           docker image ls -a
 
+      # why is this necessary? If not done, fails with
+      # unable to open /github/workspace/image.tar as an OCI Image: stat /github/workspace/image.tar/index.json: not a directory
+      - name: unpack the OCI tars
+        run: |
+          mkdir -p __trivy_scan/image/
+          tar -xf image.tar -C __trivy_scan/image/
+
       - name: Save Trivy vulnerability attestation
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ inputs.enable-trivy-scan }}
         with:
-          input: /github/workspace/image.tar
+          input: /github/workspace/__trivy_scan/image
           scan-type: image
           exit-code: "0"
           format: cosign-vuln
@@ -235,13 +242,6 @@ jobs:
           name: ${{ steps.slugify-image.outputs.slug }}-trivy-attestation
           path: |
             trivy-vuln-attestation.json
-
-      # why is this necessary? If not done, fails with 
-      # unable to open /github/workspace/image.tar as an OCI Image: stat /github/workspace/image.tar/index.json: not a directory
-      - name: unpack the OCI tars
-        run: |
-          mkdir -p __trivy_scan/image/
-          tar -xf image.tar -C __trivy_scan/image/
 
       - name: Run Trivy vulnerability scanner for GitHub Security tab
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
@@ -269,7 +269,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
-          input: /github/workspace/image.tar
+          input: /github/workspace/__trivy_scan/image
           scan-type: image
           exit-code: "0"
           format: "template"
