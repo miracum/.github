@@ -26,6 +26,7 @@ jobs:
       image: ghcr.io/miracum/github-reusable-workflow
       enable-build-test-layer: true
       enable-upload-test-image: true
+      platforms: linux/amd64,linux/arm64
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -60,7 +61,6 @@ jobs:
       enable-upload-test-image: true
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
-      platforms: linux/amd64,linux/arm64 # ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -96,9 +96,10 @@ jobs:
         with:
           name: ${{ needs.build.outputs.image-slug }}-test
           path: /tmp
-      
+
       - name: ls
         run: |
+          echo ""${{ needs.build.outputs.image-tags }}""
           ls -lsa /tmp
 
       - name: Install regctl
