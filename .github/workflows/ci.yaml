@@ -96,6 +96,10 @@ jobs:
         with:
           name: ${{ needs.build.outputs.image-slug }}-test
           path: /tmp
+      
+      - name: ls
+        run: |
+          ls -lsa /tmp
 
       - name: load image
         if: ${{ github.event_name == 'pull_request' }}
