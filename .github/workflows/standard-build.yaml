@@ -158,7 +158,11 @@ jobs:
         with:
           context: ${{ inputs.build-context }}
           push: false
-          load: true
+          # Load is a shorthand for --output=type=docker (default false)
+          # instead, we use the explicit output specification below.
+          # see <https://github.com/concourse/oci-build-task/issues/85#issuecomment-2092798670>
+          # load: true
+          outputs: type=image
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
           cache-from: type=gha
