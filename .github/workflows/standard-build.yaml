@@ -216,7 +216,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ inputs.enable-trivy-scan }}
         with:
-          image-ref: /tmp/image.tar
+          input: /tmp/image.tar
           exit-code: "0"
           format: cosign-vuln
           output: trivy-vuln-attestation.json
@@ -234,7 +234,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
-          image-ref: /tmp/image.tar
+          input: /tmp/image.tar
           exit-code: "0"
           format: "sarif"
           output: "trivy-results.sarif"
@@ -255,7 +255,7 @@ jobs:
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
-          image-ref: /tmp/image.tar
+          input: /tmp/image.tar
           exit-code: "0"
           format: "template"
           template: "@trivy-pr-report.md.tpl"
