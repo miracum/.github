@@ -60,6 +60,7 @@ jobs:
       enable-upload-test-image: false
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
+      platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 

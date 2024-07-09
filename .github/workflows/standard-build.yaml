@@ -50,6 +50,12 @@ on:
         required: false
         default: ""
         type: string
+      platforms:
+        description: "List of target platforms for build"
+        required: false
+        type: string
+        default: |
+          linux/amd64
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
@@ -133,6 +139,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4fd812986e6c8c2a69e18311145f9371337f27d4 # v3.4.0
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@5927c834f5b4fdf503fca6f4c7eccda82949e1ee # v3.1.0
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
         if: ${{ github.event_name != 'pull_request' }}
@@ -155,6 +164,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           target: test
+          platforms: ${{ inputs.platforms }}
 
       - uses: rlespinasse/slugify-value@a4879db1eb3db9bbee01dca36f98a8236c2b8239 # v1.4.0
         id: slugify-image
@@ -188,10 +198,13 @@ jobs:
           # this way, we can save it as an artifact in later steps
           load: ${{ github.event_name == 'pull_request' }}
           push: ${{ github.event_name != 'pull_request' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
+          provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
           labels: ${{ steps.image_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: ${{ inputs.platforms }}
 
       - name: Save container image as tar archive
         if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image == true }}
