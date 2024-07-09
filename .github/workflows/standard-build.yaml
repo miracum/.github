@@ -195,7 +195,7 @@ jobs:
           # this way, we can save it as an artifact in later steps
           # otherwise (on branch-push or releases), push the image to
           # the registry
-          outputs: ${{ github.event_name == 'pull_request' && 'type=oci,dest=/tmp/image.tar' || 'type=registry' }}
+          outputs: ${{ github.event_name == 'pull_request' && 'type=oci,dest=/tmp/image.tar' || 'type=oci,dest=/tmp/image.tar type=registry' }}
           sbom: ${{ github.event_name != 'pull_request' }}
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
@@ -211,12 +211,18 @@ jobs:
           name: ${{ steps.slugify-image.outputs.slug }}
           path: |
             /tmp/image.tar
+      
+      - name: display images
+        run: |
+          ls -lsaR /tmp
+          docker image ls -a
 
       - name: Save Trivy vulnerability attestation
         uses: aquasecurity/trivy-action@7c2007bcb556501da015201bcba5aa14069b74e2 # 0.23.0
         if: ${{ inputs.enable-trivy-scan }}
         with:
           input: /tmp/image.tar
+          scan-type: image
           exit-code: "0"
           format: cosign-vuln
           output: trivy-vuln-attestation.json
@@ -235,6 +241,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
         with:
           input: /tmp/image.tar
+          scan-type: image
           exit-code: "0"
           format: "sarif"
           output: "trivy-results.sarif"
@@ -256,6 +263,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
         with:
           input: /tmp/image.tar
+          scan-type: image
           exit-code: "0"
           format: "template"
           template: "@trivy-pr-report.md.tpl"

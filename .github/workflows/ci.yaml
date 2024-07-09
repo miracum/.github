@@ -55,7 +55,7 @@ jobs:
       actions: read
       security-events: write
     with:
-      image: ghcr.io/miracum/github-reusable-workflow-without-test-image
+      image: ghcr.io/miracum/github-reusable-workflow-with-fixed-image-tags
       enable-build-test-layer: true
       enable-upload-test-image: true
       image-tags: |
