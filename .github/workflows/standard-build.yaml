@@ -162,7 +162,7 @@ jobs:
           # instead, we use the explicit output specification below.
           # see <https://github.com/concourse/oci-build-task/issues/85#issuecomment-2092798670>
           # load: true
-          outputs: type=image,dest=/tmp/image-test.tar
+          outputs: type=oci,dest=/tmp/image-test.tar
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
           cache-from: type=gha
@@ -195,7 +195,7 @@ jobs:
           # this way, we can save it as an artifact in later steps
           # otherwise (on branch-push or releases), push the image to
           # the registry
-          outputs: ${{ github.event_name == 'pull_request' && 'type=image,dest=/tmp/image.tar' || 'type=registry' }}
+          outputs: ${{ github.event_name == 'pull_request' && 'type=oci,dest=/tmp/image.tar' || 'type=registry' }}
           sbom: ${{ github.event_name != 'pull_request' }}
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
