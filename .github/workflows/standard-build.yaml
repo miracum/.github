@@ -262,7 +262,7 @@ jobs:
             --exit-code=0 \
             --format=template \
             --output=trivy-pr-report.md \
-            --template=@trivy-pr-report.md.tpl \
+            --template="@trivy-pr-report.md.tpl" \
             --ignore-unfixed="${{ inputs.trivy-ignore-unfixed }}" \ 
             "${{ fromJson(steps.image_meta.outputs.json).tags[0] }}"
 
