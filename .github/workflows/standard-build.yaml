@@ -263,7 +263,7 @@ jobs:
             --format=template \
             --output=trivy-pr-report.md \
             --template="@trivy-pr-report.md.tpl" \
-            --ignore-unfixed="${{ inputs.trivy-ignore-unfixed }}" \ 
+            --ignore-unfixed="${{ inputs.trivy-ignore-unfixed }}" \
             "${{ fromJson(steps.image_meta.outputs.json).tags[0] }}"
 
       - name: Add trivy report PR comment
