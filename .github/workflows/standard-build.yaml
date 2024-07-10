@@ -268,7 +268,8 @@ jobs:
 
       - name: Add trivy report PR comment
         uses: marocchino/sticky-pull-request-comment@331f8f5b4215f0445d3c07b4967662a32a2d3e31 # v2.9.0
-        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
+        # when running from a fork, the CI token doesn't have enough permissions to create PR comments
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan && github.event.pull_request.head.repo.fork }}
         with:
           recreate: true
           header: "trivy-report-comment-${{ steps.slugify-image.outputs.slug }}"
