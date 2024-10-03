@@ -23,7 +23,7 @@ on:
 jobs:
   check-links:
     name: check links using lychee
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       issues: write
     steps:
@@ -63,7 +63,7 @@ jobs:
 
   trivy-scan:
     name: scan images with trivy
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         image: ${{ fromJSON(inputs.images) }}
