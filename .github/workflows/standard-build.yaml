@@ -124,6 +124,7 @@ jobs:
       - name: Set up containerd image store
         shell: bash
         run: |
+          [ -f /etc/docker/daemon.json ] || echo "{}" | sudo tee /etc/docker/daemon.json
           jq '. | .+{"features": {"containerd-snapshotter": true}}' /etc/docker/daemon.json > /tmp/docker-daemon-with-containerd.json
           sudo mv /tmp/docker-daemon-with-containerd.json /etc/docker/daemon.json
           cat /etc/docker/daemon.json
@@ -230,14 +231,34 @@ jobs:
 
       - name: install trivy
         run: |
-          wget https://github.com/aquasecurity/trivy/releases/download/v0.53.0/trivy_0.53.0_Linux-64bit.deb
-          sudo dpkg -i trivy_0.53.0_Linux-64bit.deb
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.56.0/trivy_0.56.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.56.0_Linux-64bit.deb
+
+      - name: Check trivy db sha
+        id: trivy-db-sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          endpoint='/orgs/aquasecurity/packages/container/trivy-db/versions'
+          headers='Accept: application/vnd.github+json'
+          jqFilter='.[] | select(.metadata.container.tags[] | contains("latest")) | .name | sub("sha256:";"")'
+          sha=$(gh api -H "${headers}" "${endpoint}" | jq --raw-output "${jqFilter}")
+          echo "Trivy DB sha256:${sha}"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: "${{ github.workspace }}/.cache/trivy"
+          key: ${{ runner.os }}-trivy-db-${{ steps.trivy-db-sha.outputs.sha }}
 
       - name: Create Trivy vulnerability attestation
         if: ${{ inputs.enable-trivy-scan }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           trivy image \
             --exit-code=0 \
+            --cache-dir="${{ github.workspace }}/.cache/trivy" \
             --format=cosign-vuln \
             --output=trivy-vuln-attestation.json \
             --ignore-unfixed="${{ inputs.trivy-ignore-unfixed }}" \
@@ -258,9 +279,12 @@ jobs:
 
       - name: Run Trivy vulnerability scanner for PR comment
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           trivy image \
             --exit-code=0 \
+            --cache-dir="${{ github.workspace }}/.cache/trivy" \
             --format=template \
             --output=trivy-pr-report.md \
             --template="@trivy-pr-report.md.tpl" \
