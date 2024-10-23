@@ -270,7 +270,6 @@ jobs:
         run: |
           trivy image \
             --exit-code=0 \
-            --cache-dir="${{ github.workspace }}/.cache/trivy" \
             --format=template \
             --output=trivy-pr-report.md \
             --template="@trivy-pr-report.md.tpl" \
