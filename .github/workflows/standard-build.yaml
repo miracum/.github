@@ -8,6 +8,8 @@ defaults:
     shell: bash
 
 env:
+  # renovate: datasource=github-releases depName=aquasecurity/trivy
+  TRIVY_VERSION: 0.56.2
   TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
   TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
 
@@ -235,8 +237,8 @@ jobs:
 
       - name: install trivy
         run: |
-          wget https://github.com/aquasecurity/trivy/releases/download/v0.56.0/trivy_0.56.0_Linux-64bit.deb
-          sudo dpkg -i trivy_0.56.0_Linux-64bit.deb
+          wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb
+          sudo dpkg -i trivy_${TRIVY_VERSION}_Linux-64bit.deb
 
       - name: Create Trivy vulnerability attestation
         if: ${{ inputs.enable-trivy-scan }}
