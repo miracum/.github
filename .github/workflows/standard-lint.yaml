@@ -150,8 +150,8 @@ jobs:
           cosign dockerfile verify \
             --output text \
             --base-image-only \
-            --certificate-oidc-issuer ${OIDC_ISSUER} \
-            --certificate-identity ${CERTIFICATE_IDENTITY} \
+            --certificate-oidc-issuer "${OIDC_ISSUER}" \
+            --certificate-identity "${CERTIFICATE_IDENTITY}" \
             Dockerfile
         env:
           OIDC_ISSUER: ${{ inputs.verify-base-image-certificate-oidc-issuer }}
