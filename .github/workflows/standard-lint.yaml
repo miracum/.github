@@ -155,7 +155,7 @@ jobs:
             Dockerfile
         env:
           OIDC_ISSUER: ${{ inputs.verify-base-image-certificate-oidc-issuer }}
-          CERTIFICATE_IDENTITY: ${{ inputs.verify-base-image-certificate-oidc-issuer }}
+          CERTIFICATE_IDENTITY: ${{ inputs.verify-base-image-certificate-identity }}
 
   codeql-analyze:
     name: CodeQL analyze
