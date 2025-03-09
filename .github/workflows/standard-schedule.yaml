@@ -48,6 +48,7 @@ jobs:
         uses: lycheeverse/lychee-action@f613c4a64e50d792e0b31ec34bbcbba12263c6a6 # v2.3.0
         with:
           args: "--cache --max-cache-age 3d ."
+          failIfEmpty: false
         env:
           GITHUB_TOKEN: ${{secrets.github-token}}
 

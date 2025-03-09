@@ -301,16 +301,16 @@ jobs:
           IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           IMAGE_SLUG: ${{ steps.slugify-image.outputs.slug }}
         run: |
-          trivy image --format cyclonedx -o "$IMAGE_SLUG-sbom.cdx.json" "$IMAGE_TO_SCAN"
-          trivy image --format spdx-json -o "$IMAGE_SLUG-sbom.spdx.json" "$IMAGE_TO_SCAN"
+          mkdir -p sboms/
+          trivy image --format cyclonedx -o "sboms/$IMAGE_SLUG-sbom.cdx.json" "$IMAGE_TO_SCAN"
+          trivy image --format spdx-json -o "sboms/$IMAGE_SLUG-sbom.spdx.json" "$IMAGE_TO_SCAN"
 
       - name: Upload SBOMs
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: ${{ steps.slugify-image.outputs.slug }}-sboms
           path: |
-            "*-sbom.cdx.json"
-            "*-sbom.spdx.json"
+            "sboms/"
 
     # requires content: write access
     #   - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
