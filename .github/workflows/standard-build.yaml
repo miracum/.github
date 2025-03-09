@@ -311,7 +311,7 @@ jobs:
         with:
           name: ${{ steps.slugify-image.outputs.slug }}-sboms
           path: |
-            "sboms/"
+            ./sboms/
 
     # requires content: write access
     #   - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
