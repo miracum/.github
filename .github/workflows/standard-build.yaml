@@ -304,7 +304,6 @@ jobs:
           mkdir -p sboms/
           trivy image --format cyclonedx -o "sboms/$IMAGE_SLUG-sbom.cdx.json" "$IMAGE_TO_SCAN"
           trivy image --format spdx-json -o "sboms/$IMAGE_SLUG-sbom.spdx.json" "$IMAGE_TO_SCAN"
-          ls -lsaR ./
 
       - name: Upload SBOMs
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
@@ -462,7 +461,6 @@ jobs:
         uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           name: ${{ needs.build.outputs.image-slug }}-sboms
-          path: /tmp
 
       - name: upload assets to release
         uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
