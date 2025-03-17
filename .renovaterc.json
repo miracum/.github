@@ -6,7 +6,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^\\.github\\/workflows\\/standard-build\\.yaml$"],
+      "fileMatch": [
+        "^\\.github\\/workflows\\/standard-build\\.yaml$",
+        "^\\.github\\/workflows\\/standard-lint\\.yaml$"
+      ],
       "matchStrings": [
         "datasource=(?<datasource>.*?) depName=(?<depName>.*?)( extractVersion=(?<extractVersion>.*?))?( versioning=(?<versioning>.*?))?\\sARG .*?_VERSION=(?<currentValue>.*)\\s"
       ],

@@ -8,8 +8,8 @@ defaults:
     shell: bash
 
 env:
-  TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
-  TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
+  # renovate: datasource=pypi depName=zizmor extractVersion=^(?<version>.*)$
+  ZIZMOR_VERSION: 1.5.1
 
 on:
   workflow_call:
@@ -242,7 +242,7 @@ jobs:
 
       - name: Run zizmor (sarif)
         run: |
-          uvx zizmor@v1.4.1 --pedantic --format sarif . > results.sarif
+          uvx zizmor@${ZIZMOR_VERSION} --pedantic --format sarif . > results.sarif
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -254,6 +254,6 @@ jobs:
 
       - name: Run zizmor (fail on findings)
         run: |
-          uvx zizmor@v1.4.1 --verbose --pedantic --format plain .
+          uvx zizmor@${ZIZMOR_VERSION} --verbose --pedantic --format plain .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
