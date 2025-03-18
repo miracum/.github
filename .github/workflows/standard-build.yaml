@@ -469,5 +469,5 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           files: |
-            "*-sbom.cdx.json"
-            "*-sbom.spdx.json"
+            "**-sbom.cdx.json"
+            "**-sbom.spdx.json"
