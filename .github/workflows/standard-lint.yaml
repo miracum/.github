@@ -242,7 +242,7 @@ jobs:
 
       - name: Run zizmor (sarif)
         run: |
-          uvx zizmor@${ZIZMOR_VERSION} --pedantic --format sarif . > results.sarif
+          uvx "zizmor@${ZIZMOR_VERSION}" --pedantic --format sarif . > results.sarif
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -254,6 +254,6 @@ jobs:
 
       - name: Run zizmor (fail on findings)
         run: |
-          uvx zizmor@${ZIZMOR_VERSION} --verbose --pedantic --format plain .
+          uvx "zizmor@${ZIZMOR_VERSION}" --verbose --pedantic --format plain .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
