@@ -3,6 +3,12 @@
   "extends": ["github>miracum/.github//renovate/default"],
   "autoApprove": true,
   "automerge": true,
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -11,10 +17,8 @@
         "^\\.github\\/workflows\\/standard-lint\\.yaml$"
       ],
       "matchStrings": [
-        "datasource=(?<datasource>.*?) depName=(?<depName>.*?)( extractVersion=(?<extractVersion>.*?))?( versioning=(?<versioning>.*?))?\\sARG .*?_VERSION=(?<currentValue>.*)\\s"
-      ],
-      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
-      "extractVersionTemplate": "{{#if extractVersion}}{{{extractVersion}}}{{else}}^v(?<version>.*)${{/if}}"
+        "\\s+# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( extractVersion=(?<extractVersion>.*?))?\\s.+?_VERSION: (?<currentValue>.*)"
+      ]
     }
   ]
 }
