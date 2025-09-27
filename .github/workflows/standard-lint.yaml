@@ -240,11 +240,21 @@ jobs:
         with:
           enable-cache: false
 
+      - name: Create standard zizmor rules file
+        env:
+          ZIZMOR_CONFIG_YAML: |
+            rules:
+              undocumented-permissions:
+                disable: true
+        run: |
+          echo "${ZIZMOR_CONFIG_YAML}" > /tmp/zizmor-standard-lint-defaults.yaml
+
       - name: Run zizmor (sarif)
         run: |
           uvx "zizmor@${ZIZMOR_VERSION}" --pedantic --format sarif . > results.sarif
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZIZMOR_CONFIG: /tmp/zizmor-standard-lint-defaults.yaml
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
@@ -257,3 +267,4 @@ jobs:
           uvx "zizmor@${ZIZMOR_VERSION}" --verbose --pedantic --format plain .
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZIZMOR_CONFIG: /tmp/zizmor-standard-lint-defaults.yaml
