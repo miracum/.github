@@ -9,7 +9,7 @@ defaults:
 
 env:
   # renovate: datasource=pypi depName=zizmor
-  ZIZMOR_VERSION: 1.14.1
+  ZIZMOR_VERSION: 1.15.2
 
 on:
   workflow_call:
@@ -78,7 +78,7 @@ jobs:
         id: ml
         # You can override MegaLinter flavor used to have faster performances
         # More info at https://megalinter.io/latest/flavors/
-        uses: oxsecurity/megalinter@0dcbedd66ea456ba2d54fd350affaa15df8a0da3 # v9.0.1
+        uses: oxsecurity/megalinter@62c799d895af9bcbca5eacfebca29d527f125a57 # v9.1.0
         env:
           VALIDATE_ALL_CODEBASE: "true"
           # only try to post PR comments if it's not a fork
@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload MegaLinter scan results to GitHub Security tab
         if: ${{ always() }}
-        uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+        uses: github/codeql-action/upload-sarif@16140ae1a102900babc80a33c44059580f687047 # v4.30.9
         with:
           sarif_file: "megalinter-reports/megalinter-report.sarif"
 
@@ -116,7 +116,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Dependency Review
-        uses: actions/dependency-review-action@56339e523c0409420f6c2c9a2f4292bbb3c07dd3 # v4.8.0
+        uses: actions/dependency-review-action@40c09b7dc99638e5ddb0bfd91c1673effc064d8a # v4.8.1
 
   gradle-wrapper-validation:
     name: validate gradle wrapper
@@ -130,7 +130,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        uses: gradle/actions/wrapper-validation@4d9f0ba0025fe599b4ebab900eb7f3a1d93ef4c2 # v5.0.0
 
   base-image-signature-verification:
     name: verify Dockerfile base image signature
@@ -145,7 +145,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Install Cosign
-        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
       - run: |
           cosign dockerfile verify \
             --output text \
@@ -191,7 +191,7 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+        uses: github/codeql-action/init@16140ae1a102900babc80a33c44059580f687047 # v4.30.9
         with:
           languages: ${{ matrix.language }}
           # If you wish to specify custom queries, you can do so here or in a config file.
@@ -204,7 +204,7 @@ jobs:
       # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
       # If this step fails, then you should remove it and run the build manually (see below)
       - name: Autobuild
-        uses: github/codeql-action/autobuild@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+        uses: github/codeql-action/autobuild@16140ae1a102900babc80a33c44059580f687047 # v4.30.9
 
       # ℹ️ Command-line programs to run using the OS shell.
       # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
@@ -217,7 +217,7 @@ jobs:
       #   ./location_of_script_within_repo/buildscript.sh
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+        uses: github/codeql-action/analyze@16140ae1a102900babc80a33c44059580f687047 # v4.30.9
         with:
           category: "/language:${{matrix.language}}"
 
@@ -236,7 +236,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+        uses: astral-sh/setup-uv@3259c6206f993105e3a61b142c2d97bf4b9ef83d # v7.1.0
         with:
           enable-cache: false
 
@@ -257,7 +257,7 @@ jobs:
           ZIZMOR_CONFIG: /tmp/zizmor-standard-lint-defaults.yaml
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+        uses: github/codeql-action/upload-sarif@16140ae1a102900babc80a33c44059580f687047 # v4.30.9
         with:
           sarif_file: results.sarif
           category: zizmor
