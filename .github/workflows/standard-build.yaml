@@ -250,6 +250,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
           IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          TMPDIR: /tmp
         run: |
           trivy image \
             --exit-code=0 \
@@ -277,6 +278,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
           IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          TMPDIR: /tmp
         run: |
           trivy image \
             --exit-code=0 \
@@ -299,6 +301,7 @@ jobs:
         env:
           IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           IMAGE_SLUG: ${{ steps.slugify-image.outputs.slug }}
+          TMPDIR: /tmp
         run: |
           mkdir -p sboms/
           trivy image --format cyclonedx -o "sboms/$IMAGE_SLUG-sbom.cdx.json" "$IMAGE_TO_SCAN"
