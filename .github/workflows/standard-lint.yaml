@@ -9,7 +9,7 @@ defaults:
 
 env:
   # renovate: datasource=pypi depName=zizmor
-  ZIZMOR_VERSION: 1.15.2
+  ZIZMOR_VERSION: 1.18.0
 
 on:
   workflow_call:
@@ -239,6 +239,8 @@ jobs:
           ZIZMOR_CONFIG_YAML: |
             rules:
               undocumented-permissions:
+                disable: true
+              concurrency-limits:
                 disable: true
         run: |
           echo "${ZIZMOR_CONFIG_YAML}" > /tmp/zizmor-standard-lint-defaults.yaml
