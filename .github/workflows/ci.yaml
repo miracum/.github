@@ -28,6 +28,7 @@ jobs:
       enable-build-test-layer: true
       enable-upload-test-image: true
       platforms: linux/amd64,linux/arm64
+      free-disk-space: true
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
