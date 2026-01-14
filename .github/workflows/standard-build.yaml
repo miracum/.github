@@ -66,7 +66,7 @@ on:
         description: remove unneeded packages
         required: false
         type: boolean
-        default: false
+        default: true
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
