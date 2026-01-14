@@ -66,7 +66,7 @@ on:
         description: remove unneeded packages
         required: false
         type: boolean
-        default: false
+        default: true
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
@@ -154,24 +154,15 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
-      - name: free disk space
+      - name: Free disk space
         if: ${{ inputs.free-disk-space }}
-        run: |
-          echo "Listing 100 largest packages"
-          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
-          df -h
-          echo "Removing large packages"
-          sudo apt-get remove -y '^dotnet-.*'
-          sudo apt-get remove -y '^llvm-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          df -h
-          echo "Removing large directories"
-          # deleting 15GB
-          rm -rf /usr/share/dotnet/
-          df -h
+        uses: endersonmenezes/free-disk-space@e6ed9b02e683a3b55ed0252f1ee469ce3b39a885 # v3.1.0
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          rm_cmd: "rmz"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
