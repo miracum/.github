@@ -42,12 +42,9 @@
         "gcr.io/distroless/java21-debian12"
       ],
       "replacementName": "gcr.io/distroless/java25-debian13"
-    },
-    {
-      "matchPackageNames": [
-        "docker.io/library/gradle:9.1.0-jdk21"
-      ],
-      "replacementName": "docker.io/library/gradle:9.1.0-jdk25"
     }
-  ]
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  }
 }
