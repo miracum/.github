@@ -9,7 +9,7 @@ defaults:
 
 env:
   # renovate: datasource=github-releases depName=aquasecurity/trivy
-  TRIVY_VERSION: 0.69.1
+  TRIVY_VERSION: 0.69.2
   TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
   TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
 
@@ -254,6 +254,7 @@ jobs:
         run: |
           docker image ls -a
 
+      #
       - name: install trivy
         run: |
           wget "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb"
@@ -347,6 +348,7 @@ jobs:
       actions: read # for detecting the Github Actions environment.
       id-token: write
       packages: write # for uploading attestations.
+    # zizmor: ignore[unpinned-uses] the action requires non-pinning
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ${{ inputs.image }}
