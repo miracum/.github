@@ -244,7 +244,7 @@ jobs:
                 disable: true
               unpinned-uses:
                 ignore:
-                  - .github/workflows/standard-build.yaml
+                  - ./.github/workflows/standard-build.yaml
         run: |
           echo "${ZIZMOR_CONFIG_YAML}" > /tmp/zizmor-standard-lint-defaults.yaml
 
