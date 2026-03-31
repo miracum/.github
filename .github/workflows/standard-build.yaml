@@ -26,6 +26,10 @@ on:
         required: false
         default: "."
         type: string
+      build-args:
+        description: "List of build arguments to pass to the image build step."
+        required: false
+        type: string
       enable-upload-image:
         description: "If enabled, upload the image as a build artifact"
         required: false
@@ -205,6 +209,7 @@ jobs:
           cache-to: type=gha,mode=max
           target: test
           platforms: ${{ inputs.platforms }}
+          build-args: ${{ inputs.build-args }}
 
       - uses: rlespinasse/slugify-value@a4879db1eb3db9bbee01dca36f98a8236c2b8239 # v1.4.0
         id: slugify-image
@@ -241,6 +246,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: ${{ inputs.platforms }}
+          build-args: ${{ inputs.build-args }}
 
       - name: Upload container image
         if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image == true }}
