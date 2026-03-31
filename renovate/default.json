@@ -46,5 +46,9 @@
   ],
   "lockFileMaintenance": {
     "enabled": true
-  }
+  },
+  "minimumReleaseAge": "14 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
+  "prCreation": "not-pending",
+  "internalChecksFilter": "strict"
 }
