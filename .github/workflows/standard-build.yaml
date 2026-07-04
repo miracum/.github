@@ -476,7 +476,7 @@ jobs:
           gh attestation download "oci://${IMAGE}" \
             --repo="${REPO}" \
             --predicate-type="https://slsa.dev/provenance/v1"
-          mv "${IMAGE_DIGEST/:/-}.jsonl" "$IMAGE_SLUG.intoto.jsonl"
+          mv "${IMAGE_DIGEST}.jsonl" "$IMAGE_SLUG.intoto.jsonl"
 
       - name: upload assets to release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0 # zizmor: ignore[superfluous-actions] upload release assets directly
