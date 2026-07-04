@@ -471,9 +471,10 @@ jobs:
           IMAGE: "${{ inputs.image }}@${{ needs.build.outputs.image-digest }}"
           IMAGE_DIGEST: "${{ needs.build.outputs.image-digest }}"
           IMAGE_SLUG: "${{ needs.build.outputs.image-slug }}"
+          REPO: ${{ github.repository }}
         run: |
           gh attestation download "oci://${IMAGE}" \
-            --repo="${{ github.repository }}" \
+            --repo="${REPO}" \
             --predicate-type="https://slsa.dev/provenance/v1"
           mv "${IMAGE_DIGEST/:/-}.jsonl" "$IMAGE_SLUG.intoto.jsonl"
 
