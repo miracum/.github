@@ -356,6 +356,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+      artifact-metadata: write
       packages: write # for pushing the attestation to ghcr.io.
     steps:
       - name: Harden Runner
