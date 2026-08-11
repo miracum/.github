@@ -402,8 +402,16 @@ jobs:
       #
       - name: install trivy
         run: |
-          wget "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb"
-          sudo dpkg -i "trivy_${TRIVY_VERSION}_Linux-64bit.deb"
+          case "$(dpkg --print-architecture)" in
+            amd64) TRIVY_ARCH="64bit" ;;
+            arm64) TRIVY_ARCH="ARM64" ;;
+            *)
+              echo "Unsupported architecture: $(dpkg --print-architecture)" >&2
+              exit 1
+              ;;
+          esac
+          wget "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.deb"
+          sudo dpkg -i "trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.deb"
 
       - name: Create Trivy vulnerability attestation
         if: ${{ inputs.enable-trivy-scan }}
