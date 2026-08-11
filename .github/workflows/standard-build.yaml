@@ -71,6 +71,11 @@ on:
         required: false
         type: boolean
         default: true
+      runs-on:
+        description: "The runner to build the image on. Set to `ubuntu-24.04-arm` to build natively on an arm64 runner."
+        required: false
+        type: string
+        default: "ubuntu-24.04"
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
@@ -107,7 +112,7 @@ on:
 jobs:
   build:
     name: build image
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runs-on }}
     permissions:
       contents: read
       packages: write

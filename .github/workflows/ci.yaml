@@ -72,6 +72,27 @@ jobs:
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  build-arm-native:
+    uses: ./.github/workflows/standard-build.yaml
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+      pull-requests: write
+      actions: read
+      security-events: write
+      attestations: write
+      artifact-metadata: write
+    with:
+      image: ghcr.io/miracum/github-reusable-workflow-arm-native
+      enable-build-test-layer: true
+      enable-upload-test-image: true
+      platforms: linux/arm64
+      runs-on: ubuntu-24.04-arm
+      free-disk-space: false
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
   lint:
     uses: ./.github/workflows/standard-lint.yaml
     permissions:
