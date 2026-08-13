@@ -202,7 +202,7 @@ jobs:
           context: ${{ inputs.build-context }} # zizmor: ignore[template-injection]
           push: false
           load: true
-          outputs: type=oci,dest=./image-test.tar
+          outputs: type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
           cache-from: type=gha
@@ -236,9 +236,15 @@ jobs:
           # this way, we can save it as an artifact in later steps
           # otherwise (on branch-push or releases), push the image to
           # the registry
+          #
+          # the registry push is expressed as a second `outputs` entry rather
+          # than the `push` input: buildx's `--push` shorthand creates its own
+          # implicit output that does not inherit the compression settings of
+          # explicitly-specified outputs, silently falling back to gzip.
           load: ${{ github.event_name == 'pull_request' }}
-          push: ${{ github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name) }}
-          outputs: type=oci,dest=./image.tar
+          outputs: |
+            type=oci,dest=./image.tar,oci-mediatypes=true,compression=zstd,force-compression=true
+            ${{ (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || '' }}
           sbom: ${{ github.event_name != 'pull_request' }}
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
