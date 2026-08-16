@@ -35,6 +35,11 @@ on:
         required: false
         default: ""
         type: string
+      enable-upload-image:
+        description: "If enabled, save every image built during a pull_request build as a docker-loadable tar and upload it as a single `images` artifact, with each file inside named `<slug>.tar`"
+        required: false
+        default: true
+        type: boolean
       enable-trivy-scan:
         description: "If enabled, scan every image built by bake using trivy and publish a signed attestation"
         required: false
@@ -63,7 +68,9 @@ on:
           JSON array with one entry per image built by bake, each with the
           keys `target` (the bake target name), `name` (image name without
           tag), `tags` (array of tags), `digest`, and `slug` (a
-          filesystem/artifact-name-safe version of the first tag).
+          filesystem/artifact-name-safe version of the first tag, also used
+          as the `<slug>.tar` filename inside the `images` artifact when
+          `enable-upload-image` is set).
     secrets:
       github-token:
         description: "The GitHub workflow token used to push to ghcr.io. Also used by trivy"
@@ -127,15 +134,21 @@ jobs:
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
-        if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name) }}
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.github-token }}
 
-      # when in a PR from a fork, load the built images into the local docker
-      # daemon instead of pushing them so they can still be scanned by trivy
-      # below. otherwise, push straight to the registry with the same
+      # pull_request builds (from a fork or not) are never pushed to the
+      # registry: they're loaded into the local docker daemon instead, so
+      # they can still be scanned by trivy below and, if enabled, saved as
+      # tar artifacts. this is a deliberate simplification compared to the
+      # Dockerfile-based standard-build workflow, which also pushes
+      # same-repo PR builds -- doing so here would require a per-target
+      # dual-output (push + local) `--set` override, which isn't reliably
+      # expressible without first resolving the bake file's target names.
+      # non-PR events push straight to the registry with the same
       # oci-mediatype+zstd settings used by the standard, non-bake, build
       # workflow.
       - name: Build and push images
@@ -151,7 +164,7 @@ jobs:
             *.platform=${{ inputs.platforms }}
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
-            *.output=${{ (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || 'type=docker' }}
+            *.output=${{ github.event_name != 'pull_request' && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || 'type=docker' }}
             ${{ inputs.bake-set }}
 
       - name: display images
@@ -178,6 +191,24 @@ jobs:
             ]
           ' <<<"${METADATA}" | tee images.json
           echo "matrix=$(jq -c . images.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Save images as tar archives
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image }}
+        run: |
+          mkdir -p images
+          jq -c '.[]' images.json | while IFS= read -r image; do
+            tag=$(jq -r '.tags[0]' <<<"${image}")
+            slug=$(jq -r '.slug' <<<"${image}")
+            docker save "${tag}" -o "images/${slug}.tar"
+          done
+
+      - name: Upload images
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image }}
+        with:
+          name: images
+          path: |
+            images/
 
       - name: install trivy
         run: |
