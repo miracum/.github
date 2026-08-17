@@ -179,11 +179,11 @@ jobs:
             echo "BAKE_LABEL_SET_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      # same-repo PR builds are pushed to the registry, while fork PRs stay
-      # local-only so they can still be scanned by trivy below and saved as tar
-      # artifacts. non-PR events push straight to the registry with the same
-      # oci-mediatype+zstd settings used by the standard, non-bake, build
-      # workflow.
+      # same-repo PR builds are pushed to the registry and also loaded into the
+      # local docker daemon so they can still be scanned by trivy below and saved
+      # as tar artifacts; fork PRs stay local-only. non-PR events push straight to
+      # the registry with the same oci-mediatype+zstd settings used by the
+      # standard, non-bake, build workflow.
       - name: Build and push images
         id: bake
         uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
@@ -197,7 +197,8 @@ jobs:
             *.platform=${{ inputs.platforms }}
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
-            *.output=${{ (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || 'type=docker' }}
+            *.output=${{ github.event_name == 'pull_request' && 'type=docker' || 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' }}
+            ${{ github.event_name == 'pull_request' && github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name && '*.output=type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || '' }}
             ${{ steps.bake_labels.outputs.set }}
             ${{ inputs.bake-set }}
 
