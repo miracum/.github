@@ -45,6 +45,18 @@ on:
         required: false
         default: true
         type: boolean
+      exclude-targets-pattern:
+        description: >-
+          Extended regex matched against each bake target's key. Matching targets are still built
+          (so e.g. a Dockerfile `test` stage still runs as a build-time gate), but are excluded from
+          the `images` output and therefore from the trivy scan/SBOM, signing, provenance
+          attestation, and the uploaded `images` artifact - none of which make sense for a target
+          that's never actually published/deployed. Defaults to this workflow's own documented
+          build-gate convention (see the `app`/`app-test` example bake file); set to an empty string
+          to disable filtering and include every built target.
+        required: false
+        default: '-test$'
+        type: string
       trivy-ignore-unfixed:
         description: "Ignore unfixed/unfixable vulnerabilities in reports"
         required: false
@@ -65,9 +77,9 @@ on:
       images:
         value: ${{ jobs.build.outputs.images }}
         description: >-
-          JSON array with one entry per image built by bake, each with the
-          keys `target` (the bake target name), `name` (image name without
-          tag), `tags` (array of tags), `digest`, and `slug` (a
+          JSON array with one entry per image built by bake and not excluded by
+          `exclude-targets-pattern`, each with the keys `target` (the bake target name), `name`
+          (image name without tag), `tags` (array of tags), `digest`, and `slug` (a
           filesystem/artifact-name-safe version of the first tag, also used
           as the `<slug>.tar` filename inside the `images` artifact when
           `enable-upload-image` is set).
@@ -184,13 +196,16 @@ jobs:
         # zizmor: ignore[template-injection] the metadata is written into a `<<'EOF'` heredoc, whose
         # quoted delimiter means the shell treats its content as inert literal text, not code to
         # execute - unlike an unquoted `${{ }}` interpolated directly into a shell command.
+        env:
+          EXCLUDE_TARGETS_PATTERN: ${{ inputs.exclude-targets-pattern }}
         run: |
           cat <<'BAKE_METADATA_EOF' > "${RUNNER_TEMP}/bake-metadata.json"
           ${{ steps.bake.outputs.metadata }}
           BAKE_METADATA_EOF
-          jq -c '
+          jq -c --arg pattern "${EXCLUDE_TARGETS_PATTERN}" '
             [
               to_entries[]
+              | select(($pattern | length) == 0 or (.key | test($pattern) | not))
               | {
                   target: .key,
                   digest: .value["containerimage.digest"],
