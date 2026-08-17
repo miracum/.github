@@ -173,9 +173,21 @@ jobs:
 
       - name: Compute image matrix
         id: images
-        env:
-          METADATA: ${{ steps.bake.outputs.metadata }}
+        # bake's metadata output grows with the number of targets built (one full buildx metadata
+        # entry per target) - with enough targets it can reach hundreds of KB. Passing something
+        # that size through `env:` and into a shell variable counts against the OS's ARG_MAX for
+        # the process GitHub Actions spawns to run this step, and fails with "Argument list too
+        # long" once it's large enough. Writing it into a file instead - via a quoted (inert,
+        # non-expanding) heredoc embedded directly in the script body, which GitHub Actions expands
+        # into the script *file* it writes to disk rather than into that process's environment -
+        # sidesteps the limit regardless of target count.
+        # zizmor: ignore[template-injection] the metadata is written into a `<<'EOF'` heredoc, whose
+        # quoted delimiter means the shell treats its content as inert literal text, not code to
+        # execute - unlike an unquoted `${{ }}` interpolated directly into a shell command.
         run: |
+          cat <<'BAKE_METADATA_EOF' > "${RUNNER_TEMP}/bake-metadata.json"
+          ${{ steps.bake.outputs.metadata }}
+          BAKE_METADATA_EOF
           jq -c '
             [
               to_entries[]
@@ -189,7 +201,7 @@ jobs:
                   slug: ((.tags[0] // .target) | gsub("[^a-zA-Z0-9]"; "-")),
                 }
             ]
-          ' <<<"${METADATA}" | tee images.json
+          ' "${RUNNER_TEMP}/bake-metadata.json" | tee images.json
           echo "matrix=$(jq -c . images.json)" >> "$GITHUB_OUTPUT"
 
       - name: Save images as tar archives
