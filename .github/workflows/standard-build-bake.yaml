@@ -152,6 +152,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.github-token }}
 
+      # standard-build.yaml gets its standard OCI labels (source, revision, licenses, ...) for free
+      # from docker/metadata-action's `labels` output, fed straight into docker/build-push-action's
+      # `labels:` input. bake has no equivalent single-image `labels:` input - it builds many
+      # differently-named targets in one invocation - so the same labels are instead applied to
+      # every target uniformly via `*.labels.<key>=<value>` --set overrides below. The `images:`
+      # value here is only ever used to derive those repo-level labels (title, source, licenses,
+      # revision, created, ...), never for tags/pushing - bake targets define their own tags/names
+      # in the bake file itself.
+      - name: Container image meta
+        id: image_meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+
+      - name: Convert image labels to bake --set overrides
+        id: bake_labels
+        env:
+          LABELS: ${{ steps.image_meta.outputs.labels }}
+        run: |
+          {
+            echo "set<<BAKE_LABEL_SET_EOF"
+            while IFS= read -r label; do
+              [ -n "${label}" ] && echo "*.labels.${label}"
+            done <<< "${LABELS}"
+            echo "BAKE_LABEL_SET_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       # pull_request builds (from a fork or not) are never pushed to the
       # registry: they're loaded into the local docker daemon instead, so
       # they can still be scanned by trivy below and, if enabled, saved as
@@ -177,6 +204,7 @@ jobs:
             *.cache-from=type=gha
             *.cache-to=type=gha,mode=max
             *.output=${{ github.event_name != 'pull_request' && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || 'type=docker' }}
+            ${{ steps.bake_labels.outputs.set }}
             ${{ inputs.bake-set }}
 
       - name: display images
