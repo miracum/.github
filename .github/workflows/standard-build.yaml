@@ -76,6 +76,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable-build-cache:
+        description: "If enabled, caches image layers across builds by pushing/pulling a `<image>:buildcache` tag to/from the same registry the built image itself is pushed to. Disable for Dockerfiles that get more value from enable-buildkit-cache-mount-caching than from layer caching, to skip the extra registry round-trip."
+        required: false
+        default: true
+        type: boolean
     outputs:
       image-tags:
         value: ${{ jobs.build.outputs.image-tags }}
@@ -234,8 +239,8 @@ jobs:
           outputs: type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ inputs.image }}:buildcache # zizmor: ignore[template-injection]
-          cache-to: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
           target: test
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
@@ -278,8 +283,8 @@ jobs:
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
           labels: ${{ steps.image_meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ inputs.image }}:buildcache # zizmor: ignore[template-injection]
-          cache-to: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
 
