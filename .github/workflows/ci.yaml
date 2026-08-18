@@ -29,6 +29,7 @@ jobs:
       image: ghcr.io/miracum/github-reusable-workflow
       enable-build-test-layer: true
       enable-upload-test-image: true
+      enable-buildkit-cache-mount-caching: true
       platforms: linux/amd64,linux/arm64
       free-disk-space: true
     secrets:
@@ -69,24 +70,6 @@ jobs:
       enable-upload-test-image: true
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  build-bake:
-    uses: ./.github/workflows/standard-build-bake.yaml
-    permissions:
-      contents: write
-      id-token: write
-      packages: write
-      pull-requests: write
-      actions: read
-      security-events: write
-      attestations: write
-      artifact-metadata: write
-    with:
-      bake-files: docker-bake.hcl
-      bake-vars: |
-        TAG=${{ github.sha }}
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
