@@ -3,6 +3,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # cache mounts here exist to dogfood standard-build.yaml's
 # enable-buildkit-cache-mount-caching input, not because this trivial
 # install needs it
+# hadolint ignore=DL3008
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
