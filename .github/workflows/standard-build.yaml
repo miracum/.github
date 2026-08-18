@@ -234,8 +234,8 @@ jobs:
           outputs: type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ inputs.image }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.image }}
           target: test
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
@@ -278,8 +278,8 @@ jobs:
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
           tags: ${{ steps.image_meta.outputs.tags }}
           labels: ${{ steps.image_meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ inputs.image }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.image }}
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
 
