@@ -82,6 +82,7 @@ jobs:
       pull-requests: write # for megalinter to post PR comments
       issues: write # for megalinter to post PR comments via the issue comments API
       security-events: write # for uploading CodeQL and zizmor SARIF results
+      actions: read # required by the codeql-analyze/zizmor jobs in standard-lint.yaml
     with:
       codeql-languages: '["python"]'
       enable-codeql: true
