@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.14.6-slim@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144 AS base
+FROM docker.io/library/python:3.14.7-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 # cache mounts here exist to dogfood standard-build.yaml's
 # enable-buildkit-cache-mount-caching input, not because this trivial
