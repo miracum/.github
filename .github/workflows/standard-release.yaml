@@ -34,9 +34,9 @@ jobs:
     # is configured to only run on pushes to master as well.
     if: ${{ github.event_name  == 'push' }}
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+      contents: write # for semantic-release to create tags, releases, and push version commits
+      pull-requests: write # for semantic-release to comment on related PRs
+      issues: write # for semantic-release to comment on related issues
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1

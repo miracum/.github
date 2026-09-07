@@ -15,11 +15,11 @@ permissions:
 
 jobs:
   schedule:
-    uses: ./.github/workflows/standard-schedule.yaml
+    uses: $/.github/workflows/standard-schedule.yaml
     permissions:
       contents: read
-      issues: write
-      security-events: write
+      issues: write # for the link checker to open/update a report issue
+      security-events: write # for uploading trivy scan results to the security tab
     with:
       images: "['ghcr.io/miracum/github-reusable-workflow:master', 'ghcr.io/miracum/github-reusable-workflow:master']"
     secrets:
