@@ -8,21 +8,25 @@ on:
   pull_request:
     branches: [master]
 
+# cancel superseded PR runs, but let master pushes/releases run to completion
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
 jobs:
   build:
-    uses: ./.github/workflows/standard-build.yaml
+    uses: $/.github/workflows/standard-build.yaml
     permissions:
-      contents: write
-      id-token: write
-      packages: write
-      pull-requests: write
-      actions: read
-      security-events: write
-      attestations: write
-      artifact-metadata: write
+      contents: write # to upload SBOMs and SLSA attestations to release assets
+      id-token: write # for keyless image signing and OIDC-based attestations
+      packages: write # to push the image and its attestations to ghcr.io
+      pull-requests: write # for the trivy scan PR comment
+      security-events: write # for uploading trivy scan results to the security tab
+      attestations: write # to publish build provenance attestations
+      artifact-metadata: write # required by actions/attest-build-provenance
     with:
       # can't use the default "ghcr.io/${{ github.repository }}" since
       # "ghcr.io/miracum/.github:pr-1": invalid reference format"
@@ -36,16 +40,15 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-without-test-image:
-    uses: ./.github/workflows/standard-build.yaml
+    uses: $/.github/workflows/standard-build.yaml
     permissions:
-      contents: write
-      id-token: write
-      packages: write
-      pull-requests: write
-      actions: read
-      security-events: write
-      attestations: write
-      artifact-metadata: write
+      contents: write # to upload SBOMs and SLSA attestations to release assets
+      id-token: write # for keyless image signing and OIDC-based attestations
+      packages: write # to push the image and its attestations to ghcr.io
+      pull-requests: write # for the trivy scan PR comment
+      security-events: write # for uploading trivy scan results to the security tab
+      attestations: write # to publish build provenance attestations
+      artifact-metadata: write # required by actions/attest-build-provenance
     with:
       image: ghcr.io/miracum/github-reusable-workflow-without-test-image
       enable-build-test-layer: false
@@ -54,16 +57,15 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-with-fixed-image-tags:
-    uses: ./.github/workflows/standard-build.yaml
+    uses: $/.github/workflows/standard-build.yaml
     permissions:
-      contents: write
-      id-token: write
-      packages: write
-      pull-requests: write
-      actions: read
-      security-events: write
-      attestations: write
-      artifact-metadata: write
+      contents: write # to upload SBOMs and SLSA attestations to release assets
+      id-token: write # for keyless image signing and OIDC-based attestations
+      packages: write # to push the image and its attestations to ghcr.io
+      pull-requests: write # for the trivy scan PR comment
+      security-events: write # for uploading trivy scan results to the security tab
+      attestations: write # to publish build provenance attestations
+      artifact-metadata: write # required by actions/attest-build-provenance
     with:
       image: ghcr.io/miracum/github-reusable-workflow-with-fixed-image-tags
       enable-build-test-layer: true
@@ -74,13 +76,13 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
   lint:
-    uses: ./.github/workflows/standard-lint.yaml
+    uses: $/.github/workflows/standard-lint.yaml
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
-      security-events: write
-      actions: read
+      pull-requests: write # for megalinter to post PR comments
+      issues: write # for megalinter to post PR comments via the issue comments API
+      security-events: write # for uploading CodeQL and zizmor SARIF results
+      actions: read # required by the codeql-analyze/zizmor jobs in standard-lint.yaml
     with:
       codeql-languages: '["python"]'
       enable-codeql: true
@@ -138,13 +140,13 @@ jobs:
           docker image ls
 
   release:
-    uses: ./.github/workflows/standard-release.yaml
+    uses: $/.github/workflows/standard-release.yaml
     needs:
       - build
       - test
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+      contents: write # for semantic-release to create tags, releases, and push version commits
+      pull-requests: write # for semantic-release to comment on related PRs
+      issues: write # for semantic-release to comment on related issues
     secrets:
       semantic-release-token: ${{ secrets.GITHUB_TOKEN }}

@@ -120,11 +120,9 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: write
-      # for uploading trivy scan results to security tab
-      security-events: write
-      # for the trivy PR comment
-      pull-requests: write
+      packages: write # to push the image to ghcr.io
+      security-events: write # for uploading trivy scan results to security tab
+      pull-requests: write # for the trivy PR comment
     outputs:
       image-version: ${{ steps.image_meta.outputs.version }}
       image-tags: ${{ steps.image_meta.outputs.tags }}
@@ -394,9 +392,9 @@ jobs:
       - build
     permissions:
       contents: read
-      id-token: write
-      attestations: write
-      artifact-metadata: write
+      id-token: write # for OIDC-based keyless signing of the provenance attestation
+      attestations: write # to publish the build provenance attestation
+      artifact-metadata: write # required by actions/attest-build-provenance
       packages: write # for pushing the attestation to ghcr.io.
     steps:
       - name: Harden Runner
@@ -426,8 +424,8 @@ jobs:
       - build
     permissions:
       contents: read
-      id-token: write
-      packages: write
+      id-token: write # for OIDC-based keyless image signing
+      packages: write # to push the signature to ghcr.io
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -459,8 +457,8 @@ jobs:
       - build
     permissions:
       contents: read
-      id-token: write
-      packages: write
+      id-token: write # for OIDC-based keyless attestation
+      packages: write # to push the vulnerability attestation to ghcr.io
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -498,8 +496,7 @@ jobs:
       - image-provenance
       - build
     permissions:
-      # to upload artifacts to the release
-      contents: write
+      contents: write # to upload artifacts to the release
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -532,8 +529,7 @@ jobs:
     needs:
       - build
     permissions:
-      # to upload artifacts to the release
-      contents: write
+      contents: write # to upload artifacts to the release
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1

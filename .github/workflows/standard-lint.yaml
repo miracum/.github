@@ -65,8 +65,8 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ github.event_name == 'pull_request' }}
     permissions:
-      issues: write
-      pull-requests: write
+      issues: write # for megalinter to post PR comments via the issue comments API
+      pull-requests: write # for megalinter to post PR comments
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -156,9 +156,9 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ inputs.enable-codeql }}
     permissions:
-      actions: read
+      actions: read # required by github/codeql-action to upload SARIF results
       contents: read
-      security-events: write
+      security-events: write # for uploading CodeQL SARIF results
     strategy:
       fail-fast: false
       matrix:
@@ -220,9 +220,9 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ github.event_name == 'pull_request' }}
     permissions:
-      security-events: write
+      security-events: write # for uploading zizmor SARIF results
       contents: read
-      actions: read
+      actions: read # required by github/codeql-action to upload SARIF results
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
