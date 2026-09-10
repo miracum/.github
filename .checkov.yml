@@ -13,3 +13,8 @@ skip-check:
   - CKV_K8S_10
   - CKV_K8S_12
   - CKV_K8S_29
+  # Check: CKV2_K8S_6: "Minimize the admission of pods which lack an
+  # associated NetworkPolicy" -- whether a NetworkPolicy governs a pod is a
+  # cluster-operator decision, not something a reusable Helm chart template
+  # can determine.
+  - CKV2_K8S_6
