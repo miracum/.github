@@ -1,0 +1,24 @@
+skip-check:
+  - CKV_SECRET_6
+  - CKV_K8S_21
+  - CKV_K8S_35
+  - CKV_K8S_15
+  - CKV_K8S_40
+  - CKV_K8S_13
+  - CKV_K8S_11
+  - CKV_K8S_43
+  - CKV_K8S_38
+  - CKV_K8S_22
+  - CKV_K8S_31
+  - CKV_K8S_10
+  - CKV_K8S_12
+  - CKV_K8S_29
+  # Check: CKV2_K8S_6: "Minimize the admission of pods which lack an
+  # associated NetworkPolicy" -- whether a NetworkPolicy governs a pod is a
+  # cluster-operator decision, not something a reusable Helm chart template
+  # can determine.
+  - CKV2_K8S_6
+  # Check: CKV_DOCKER_2: "Ensure that HEALTHCHECK instructions have been
+  # added to container images" -- same rationale as AVD-DS-0026 in
+  # .trivyignore: this Dockerfile only exists to dogfood standard-build.yaml.
+  - CKV_DOCKER_2

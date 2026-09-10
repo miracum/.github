@@ -75,6 +75,22 @@ jobs:
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  publish-chart:
+    uses: $/.github/workflows/standard-chart-publish.yaml
+    permissions:
+      contents: read
+      packages: write # to push the chart and its signature/attestation to ghcr.io
+      id-token: write # for keyless chart signing and OIDC-based attestations
+      attestations: write # to publish build provenance attestations
+      artifact-metadata: write # required by actions/attest-build-provenance
+    with:
+      chart-path: charts/test-chart
+      # can't use the default "ghcr.io/${{ github.repository }}" since
+      # "ghcr.io/miracum/.github/test-chart": invalid reference format"
+      registry: ghcr.io/miracum/github-reusable-workflow-chart
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
   lint:
     uses: $/.github/workflows/standard-lint.yaml
     permissions:
