@@ -1,2 +1,14 @@
 # No HEALTHCHECK defined in Dockerfile
 AVD-DS-0026
+
+# charts/test-chart: resources are deliberately left unset by default so
+# consumers of the chart decide (standard Helm chart guidance)
+AVD-KSV-0011
+AVD-KSV-0015
+AVD-KSV-0016
+AVD-KSV-0018
+# charts/test-chart: namespace is set at install time (helm install -n), not
+# hardcoded in a reusable chart template
+AVD-KSV-0110
+# charts/test-chart: default scaffold exposes the stock nginx image's port 80
+AVD-KSV-0117
