@@ -390,6 +390,16 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build
+    # ghcr.io doesn't support the OCI 1.1 referrers API, so cosign/attest
+    # fall back to a single mutable "sha256-<digest>" tag holding an index of
+    # all referrers (signature, provenance, vuln attestation) for the image.
+    # Running this alongside sign-image/attest-trivy-vulnerability-report
+    # races read-modify-write updates to that tag and can silently drop a
+    # referrer, so serialize all three via a shared concurrency group instead
+    # of letting them run in parallel.
+    concurrency:
+      group: attest-referrers-${{ github.repository }}-${{ github.run_id }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write # for OIDC-based keyless signing of the provenance attestation
@@ -422,6 +432,11 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     needs:
       - build
+    # see the comment on the image-provenance job's concurrency group: this
+    # avoids racing concurrent referrer pushes to the same ghcr.io digest.
+    concurrency:
+      group: attest-referrers-${{ github.repository }}-${{ github.run_id }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write # for OIDC-based keyless image signing
@@ -455,6 +470,11 @@ jobs:
     if: ${{ github.event_name != 'pull_request' && inputs.enable-trivy-scan }}
     needs:
       - build
+    # see the comment on the image-provenance job's concurrency group: this
+    # avoids racing concurrent referrer pushes to the same ghcr.io digest.
+    concurrency:
+      group: attest-referrers-${{ github.repository }}-${{ github.run_id }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write # for OIDC-based keyless attestation
