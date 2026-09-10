@@ -1,4 +1,4 @@
-name: Standard workflow for publishing a Helm chart as an OCI artifact
+name: Standard workflow for testing and publishing a Helm chart as an OCI artifact
 
 permissions:
   contents: read
@@ -6,6 +6,10 @@ permissions:
 defaults:
   run:
     shell: bash
+
+env:
+  # renovate: datasource=github-releases depName=helm/chart-testing
+  CT_VERSION: 3.14.0
 
 on:
   workflow_call:
@@ -20,7 +24,7 @@ on:
         default: "ghcr.io/${{ github.repository }}"
         type: string
       version:
-        description: "Overrides the chart version from Chart.yaml. Passed to `helm package --version`."
+        description: "Overrides the chart version from Chart.yaml. Passed to `helm package --version`. If unset, a release event uses its tag name and a pull_request event gets a `<chart version>-pr<number>.<short sha>` prerelease version."
         required: false
         default: ""
         type: string
@@ -30,7 +34,7 @@ on:
         default: ""
         type: string
       enable-dependency-update:
-        description: "If enabled, runs `helm dependency update` before packaging the chart."
+        description: "If enabled, runs `helm dependency update` before linting/testing/packaging the chart."
         required: false
         default: true
         type: boolean
@@ -44,6 +48,46 @@ on:
         required: false
         default: true
         type: boolean
+      target-branch:
+        description: "Branch to diff against when detecting changed charts for linting/testing"
+        required: false
+        default: "${{ github.event.repository.default_branch }}"
+        type: string
+      lint-config:
+        description: "Path to a ct lint configuration file. Leave empty to use ct's defaults."
+        required: false
+        default: ""
+        type: string
+      lint-all:
+        description: "If enabled, lints all charts next to chart-path on every run instead of only ones changed vs. target-branch"
+        required: false
+        default: true
+        type: boolean
+      enable-install:
+        description: "If enabled, spins up a kind cluster and installs charts changed vs. target-branch using ct install"
+        required: false
+        default: true
+        type: boolean
+      install-config:
+        description: "Path to a ct install configuration file. Leave empty to use ct's defaults."
+        required: false
+        default: ""
+        type: string
+      k8s-versions:
+        description: "JSON array of kind node image versions to test installation against"
+        required: false
+        default: '["1.34.8", "1.35.5", "1.36.1"]'
+        type: string
+      enable-pr-release:
+        description: "If enabled, also publishes the chart (as a prerelease version) for pull_request events, in addition to release events"
+        required: false
+        default: true
+        type: boolean
+      extra-helm-repos:
+        description: "Extra Helm chart repositories to add before linting/testing/packaging, as newline-separated 'name=url' pairs"
+        required: false
+        default: ""
+        type: string
     outputs:
       chart-name:
         value: ${{ jobs.publish.outputs.chart-name }}
@@ -63,9 +107,158 @@ on:
         required: true
 
 jobs:
+  lint:
+    name: lint charts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+        with:
+          version: ${{ env.CT_VERSION }}
+
+      - name: Add extra Helm chart repositories
+        if: ${{ inputs.extra-helm-repos != '' }}
+        env:
+          EXTRA_REPOS: ${{ inputs.extra-helm-repos }}
+        run: |
+          while IFS='=' read -r name url; do
+            [ -z "${name}" ] && continue
+            helm repo add "${name}" "${url}"
+          done <<< "${EXTRA_REPOS}"
+
+      - name: Update chart dependencies
+        if: ${{ inputs.enable-dependency-update }}
+        env:
+          CHART_DIRS: ${{ inputs.chart-path }}
+        run: |
+          CHART_DIRS="$(dirname "${CHART_DIRS}")"
+          find "${CHART_DIRS}" -maxdepth 1 ! -path "${CHART_DIRS}" -type d -exec helm dependency update {} \;
+
+      - name: Run chart-testing (lint)
+        env:
+          CHART_DIRS: ${{ inputs.chart-path }}
+          TARGET_BRANCH: ${{ inputs.target-branch }}
+          LINT_CONFIG: ${{ inputs.lint-config }}
+          LINT_ALL: ${{ inputs.lint-all }}
+        run: |
+          # maintainer validation requires every Chart.yaml to declare a
+          # maintainers list with a valid GitHub/GitLab/Bitbucket account,
+          # which most charts don't bother with; disabled by default here to
+          # keep the workflow usable out of the box, same as the org's own
+          # charts repo does in its ct.yaml.
+          ARGS=(--chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}" --validate-maintainers=false)
+          if [ -n "${LINT_CONFIG}" ]; then
+            ARGS+=(--config "${LINT_CONFIG}")
+          fi
+          if [ "${LINT_ALL}" = "true" ]; then
+            ARGS+=(--all)
+          fi
+          ct lint "${ARGS[@]}"
+
+  install:
+    name: install charts (k8s ${{ matrix.k8s-version }})
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.enable-install }}
+    needs:
+      - lint
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s-version: ${{ fromJSON(inputs.k8s-versions) }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
+        with:
+          version: ${{ env.CT_VERSION }}
+
+      - name: Add extra Helm chart repositories
+        if: ${{ inputs.extra-helm-repos != '' }}
+        env:
+          EXTRA_REPOS: ${{ inputs.extra-helm-repos }}
+        run: |
+          while IFS='=' read -r name url; do
+            [ -z "${name}" ] && continue
+            helm repo add "${name}" "${url}"
+          done <<< "${EXTRA_REPOS}"
+
+      - name: Update chart dependencies
+        if: ${{ inputs.enable-dependency-update }}
+        env:
+          CHART_DIRS: ${{ inputs.chart-path }}
+        run: |
+          CHART_DIRS="$(dirname "${CHART_DIRS}")"
+          find "${CHART_DIRS}" -maxdepth 1 ! -path "${CHART_DIRS}" -type d -exec helm dependency update {} \;
+
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        env:
+          CHART_DIRS: ${{ inputs.chart-path }}
+          TARGET_BRANCH: ${{ inputs.target-branch }}
+        run: |
+          changed=$(ct list-changed --chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}")
+          if [[ -n "${changed}" ]]; then
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Create kind cluster
+        if: ${{ steps.list-changed.outputs.changed == 'true' }}
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+        with:
+          cluster_name: kind-cluster-k8s-${{ matrix.k8s-version }}
+          node_image: kindest/node:v${{ matrix.k8s-version }}
+
+      - name: Run chart-testing (install)
+        if: ${{ steps.list-changed.outputs.changed == 'true' }}
+        env:
+          CHART_DIRS: ${{ inputs.chart-path }}
+          TARGET_BRANCH: ${{ inputs.target-branch }}
+          INSTALL_CONFIG: ${{ inputs.install-config }}
+        run: |
+          ARGS=(--chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}")
+          if [ -n "${INSTALL_CONFIG}" ]; then
+            ARGS+=(--config "${INSTALL_CONFIG}")
+          fi
+          # freshly-created kind clusters can still be finishing up
+          # ClusterIP/DNS/webhook wiring, so a first install attempt can race
+          # that and fail transiently; retrying is simpler and more robust
+          # than guessing a long-enough upfront sleep.
+          for i in 1 2 3; do
+            if ct install "${ARGS[@]}"; then
+              exit 0
+            fi
+            echo "ct install failed (attempt ${i}/3), retrying in 10s..."
+            sleep 10
+          done
+          exit 1
+
   publish:
     name: publish chart
     runs-on: ubuntu-24.04
+    needs:
+      - lint
+    if: ${{ github.event_name == 'release' || (github.event_name == 'pull_request' && inputs.enable-pr-release) }}
     permissions:
       contents: read
       packages: write # to push the chart and its signature/attestation to ghcr.io
@@ -94,20 +287,28 @@ jobs:
         run: |
           helm dependency update .
 
-      - name: Lint chart
-        working-directory: ${{ inputs.chart-path }}
-        run: |
-          helm lint .
-
       - name: Read chart metadata
         id: chart_meta
         working-directory: ${{ inputs.chart-path }}
         env:
           VERSION_OVERRIDE: ${{ inputs.version }}
           APP_VERSION_OVERRIDE: ${{ inputs.app-version }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          FULL_SHA: ${{ github.sha }}
         run: |
           NAME="$(yq '.name' Chart.yaml)"
-          VERSION="${VERSION_OVERRIDE:-$(yq '.version' Chart.yaml)}"
+          if [ -n "${VERSION_OVERRIDE}" ]; then
+            VERSION="${VERSION_OVERRIDE}"
+          elif [ "${EVENT_NAME}" = "release" ]; then
+            # strip an optional leading "v", e.g. v1.2.3 -> 1.2.3
+            VERSION="${RELEASE_TAG#v}"
+          elif [ "${EVENT_NAME}" = "pull_request" ]; then
+            VERSION="$(yq '.version' Chart.yaml)-pr${PR_NUMBER}.${FULL_SHA:0:7}"
+          else
+            VERSION="$(yq '.version' Chart.yaml)"
+          fi
           APP_VERSION="${APP_VERSION_OVERRIDE:-$(yq '.appVersion' Chart.yaml)}"
           {
             echo "name=${NAME}"

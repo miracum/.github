@@ -10,5 +10,7 @@ AVD-KSV-0018
 # charts/test-chart: namespace is set at install time (helm install -n), not
 # hardcoded in a reusable chart template
 AVD-KSV-0110
-# charts/test-chart: default scaffold exposes the stock nginx image's port 80
-AVD-KSV-0117
+# charts/test-chart: nginxinc/nginx-unprivileged isn't on trivy's default
+# trusted-registry allowlist, but it's the whole reason this pod can run
+# under the hardened securityContext below
+AVD-KSV-0125
