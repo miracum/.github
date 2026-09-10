@@ -109,9 +109,11 @@ jobs:
           NAME="$(yq '.name' Chart.yaml)"
           VERSION="${VERSION_OVERRIDE:-$(yq '.version' Chart.yaml)}"
           APP_VERSION="${APP_VERSION_OVERRIDE:-$(yq '.appVersion' Chart.yaml)}"
-          echo "name=${NAME}" >> "${GITHUB_OUTPUT}"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "app-version=${APP_VERSION}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "name=${NAME}"
+            echo "version=${VERSION}"
+            echo "app-version=${APP_VERSION}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Package chart
         id: package
@@ -149,8 +151,10 @@ jobs:
           # relying on either one specifically.
           helm push "${CHART_PACKAGE}" "oci://${REGISTRY}" > .push-output 2>&1
           cat .push-output
-          echo "reference=$(awk -F "[, ]+" '/Pushed:/{print $NF}' .push-output)" >> "${GITHUB_OUTPUT}"
-          echo "digest=$(awk -F "[, ]+" '/Digest:/{print $NF}' .push-output)" >> "${GITHUB_OUTPUT}"
+          {
+            echo "reference=$(awk -F "[, ]+" '/Pushed:/{print $NF}' .push-output)"
+            echo "digest=$(awk -F "[, ]+" '/Digest:/{print $NF}' .push-output)"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
