@@ -396,9 +396,13 @@ jobs:
     # Running this alongside sign-image/attest-trivy-vulnerability-report
     # races read-modify-write updates to that tag and can silently drop a
     # referrer, so serialize all three via a shared concurrency group instead
-    # of letting them run in parallel.
+    # of letting them run in parallel. Scoped to the image+digest (not
+    # github.run_id) so this also serializes across *separate* runs that
+    # happen to build the same digest (e.g. several unrelated commits
+    # landing back to back without touching the Dockerfile) -- run_id would
+    # only protect against races within a single run.
     concurrency:
-      group: attest-referrers-${{ github.repository }}-${{ github.run_id }}
+      group: attest-referrers-${{ inputs.image }}@${{ needs.build.outputs.image-digest }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -435,7 +439,7 @@ jobs:
     # see the comment on the image-provenance job's concurrency group: this
     # avoids racing concurrent referrer pushes to the same ghcr.io digest.
     concurrency:
-      group: attest-referrers-${{ github.repository }}-${{ github.run_id }}
+      group: attest-referrers-${{ inputs.image }}@${{ needs.build.outputs.image-digest }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -473,7 +477,7 @@ jobs:
     # see the comment on the image-provenance job's concurrency group: this
     # avoids racing concurrent referrer pushes to the same ghcr.io digest.
     concurrency:
-      group: attest-referrers-${{ github.repository }}-${{ github.run_id }}
+      group: attest-referrers-${{ inputs.image }}@${{ needs.build.outputs.image-digest }}
       cancel-in-progress: false
     permissions:
       contents: read
