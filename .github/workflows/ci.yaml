@@ -75,7 +75,7 @@ jobs:
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
-  publish-chart:
+  chart:
     uses: $/.github/workflows/standard-chart-publish.yaml
     permissions:
       contents: read
