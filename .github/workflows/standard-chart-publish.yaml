@@ -73,6 +73,16 @@ on:
         required: false
         default: ""
         type: string
+      install-all:
+        description: "If enabled, installs all charts next to chart-path on every run instead of only ones changed vs. target-branch. Unlike lint-all, this defaults to false: spinning up a kind cluster and installing is far more expensive than linting, so unconditionally doing it on every run isn't a safe default for every caller. Callers that need install to run on more than chart-path changes (e.g. because a PR only changed the application image consumed via helm-extra-set-args) should compute this themselves and pass it through."
+        required: false
+        default: false
+        type: boolean
+      helm-extra-set-args:
+        description: "Passed through to `ct install`'s `--helm-extra-set-args`, e.g. to point the chart at a just-built PR image for testing: '--set=image.tag=pr-123'. Has no effect on lint - chart-testing doesn't support this flag there, and lint never pulls the image anyway."
+        required: false
+        default: ""
+        type: string
       k8s-versions:
         description: "JSON array of kind node image versions to test installation against"
         required: false
@@ -223,22 +233,30 @@ jobs:
           fi
 
       - name: Create kind cluster
-        if: ${{ steps.list-changed.outputs.changed == 'true' }}
+        if: ${{ steps.list-changed.outputs.changed == 'true' || inputs.install-all }}
         uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           cluster_name: kind-cluster-k8s-${{ matrix.k8s-version }}
           node_image: kindest/node:v${{ matrix.k8s-version }}
 
       - name: Run chart-testing (install)
-        if: ${{ steps.list-changed.outputs.changed == 'true' }}
+        if: ${{ steps.list-changed.outputs.changed == 'true' || inputs.install-all }}
         env:
           CHART_DIRS: ${{ inputs.chart-path }}
           TARGET_BRANCH: ${{ inputs.target-branch }}
           INSTALL_CONFIG: ${{ inputs.install-config }}
+          INSTALL_ALL: ${{ inputs.install-all }}
+          HELM_EXTRA_SET_ARGS: ${{ inputs.helm-extra-set-args }}
         run: |
           ARGS=(--chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}")
           if [ -n "${INSTALL_CONFIG}" ]; then
             ARGS+=(--config "${INSTALL_CONFIG}")
+          fi
+          if [ "${INSTALL_ALL}" = "true" ]; then
+            ARGS+=(--all)
+          fi
+          if [ -n "${HELM_EXTRA_SET_ARGS}" ]; then
+            ARGS+=(--helm-extra-set-args "${HELM_EXTRA_SET_ARGS}")
           fi
           # freshly-created kind clusters can still be finishing up
           # ClusterIP/DNS/webhook wiring, so a first install attempt can race
