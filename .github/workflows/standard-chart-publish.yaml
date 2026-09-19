@@ -59,12 +59,12 @@ on:
         default: ""
         type: string
       lint-all:
-        description: "If enabled, lints all charts next to chart-path on every run instead of only ones changed vs. target-branch"
+        description: "If enabled, lints chart-path on every run instead of only when it changed vs. target-branch. Never lints charts other than chart-path - charts next to it are excluded, since a repo with several charts calls this workflow once per chart."
         required: false
         default: true
         type: boolean
       enable-install:
-        description: "If enabled, spins up a kind cluster and installs charts changed vs. target-branch using ct install"
+        description: "If enabled, spins up a kind cluster and installs chart-path with ct install when it changed vs. target-branch"
         required: false
         default: true
         type: boolean
@@ -74,7 +74,7 @@ on:
         default: ""
         type: string
       install-all:
-        description: "If enabled, installs all charts next to chart-path on every run instead of only ones changed vs. target-branch. Unlike lint-all, this defaults to false: spinning up a kind cluster and installing is far more expensive than linting, so unconditionally doing it on every run isn't a safe default for every caller. Callers that need install to run on more than chart-path changes (e.g. because a PR only changed the application image consumed via helm-extra-set-args) should compute this themselves and pass it through."
+        description: "If enabled, installs chart-path on every run instead of only when it changed vs. target-branch. Like lint-all, never touches charts other than chart-path. Unlike lint-all, this defaults to false: spinning up a kind cluster and installing is far more expensive than linting, so unconditionally doing it on every run isn't a safe default for every caller. Callers that need install to run on more than chart-path changes (e.g. because a PR only changed the application image consumed via helm-extra-set-args) should compute this themselves and pass it through."
         required: false
         default: false
         type: boolean
@@ -150,10 +150,34 @@ jobs:
       - name: Update chart dependencies
         if: ${{ inputs.enable-dependency-update }}
         env:
-          CHART_DIRS: ${{ inputs.chart-path }}
+          CHART_PATH: ${{ inputs.chart-path }}
         run: |
-          CHART_DIRS="$(dirname "${CHART_DIRS}")"
-          find "${CHART_DIRS}" -maxdepth 1 ! -path "${CHART_DIRS}" -type d -exec helm dependency update {} \;
+          # only chart-path: the charts next to it are excluded from every ct
+          # invocation below (see "Exclude the charts next to chart-path"), so
+          # building their dependencies here would be wasted work. Matches what
+          # the publish job already does.
+          helm dependency update "${CHART_PATH}"
+
+      - name: Exclude the charts next to chart-path
+        id: exclude
+        env:
+          CHART_PATH: ${{ inputs.chart-path }}
+        run: |
+          # ct discovers charts per --chart-dirs, which can only be the parent of
+          # chart-path, so every chart sitting next to this one is in scope by
+          # default. A repo publishing several charts calls this workflow once per
+          # chart, which would then lint and install every chart on every call -
+          # and, worse than the wasted runner time, apply each call's
+          # --helm-extra-set-args (typically pinning the chart to the image that
+          # call just built) to the other charts too. Excluding the siblings scopes
+          # ct - including its changed-chart detection - to chart-path alone.
+          # ct matches --excluded-charts against the chart directory's base name.
+          # A repo with a single chart produces an empty list here and is unaffected.
+          CHART_PATH="${CHART_PATH%/}"
+          siblings="$(find "$(dirname "${CHART_PATH}")" -mindepth 1 -maxdepth 1 -type d \
+            ! -name "$(basename "${CHART_PATH}")" -printf '%f\n' | sort | paste -sd,)"
+          echo "Excluding charts: ${siblings:-<none>}"
+          echo "siblings=${siblings}" >> "${GITHUB_OUTPUT}"
 
       - name: Run chart-testing (lint)
         env:
@@ -161,6 +185,7 @@ jobs:
           TARGET_BRANCH: ${{ inputs.target-branch }}
           LINT_CONFIG: ${{ inputs.lint-config }}
           LINT_ALL: ${{ inputs.lint-all }}
+          EXCLUDED_CHARTS: ${{ steps.exclude.outputs.siblings }}
         run: |
           # maintainer validation requires every Chart.yaml to declare a
           # maintainers list with a valid GitHub/GitLab/Bitbucket account,
@@ -170,6 +195,9 @@ jobs:
           ARGS=(--chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}" --validate-maintainers=false)
           if [ -n "${LINT_CONFIG}" ]; then
             ARGS+=(--config "${LINT_CONFIG}")
+          fi
+          if [ -n "${EXCLUDED_CHARTS}" ]; then
+            ARGS+=(--excluded-charts "${EXCLUDED_CHARTS}")
           fi
           if [ "${LINT_ALL}" = "true" ]; then
             ARGS+=(--all)
@@ -216,18 +244,47 @@ jobs:
       - name: Update chart dependencies
         if: ${{ inputs.enable-dependency-update }}
         env:
-          CHART_DIRS: ${{ inputs.chart-path }}
+          CHART_PATH: ${{ inputs.chart-path }}
         run: |
-          CHART_DIRS="$(dirname "${CHART_DIRS}")"
-          find "${CHART_DIRS}" -maxdepth 1 ! -path "${CHART_DIRS}" -type d -exec helm dependency update {} \;
+          # only chart-path: the charts next to it are excluded from every ct
+          # invocation below (see "Exclude the charts next to chart-path"), so
+          # building their dependencies here would be wasted work. Matches what
+          # the publish job already does.
+          helm dependency update "${CHART_PATH}"
+
+      - name: Exclude the charts next to chart-path
+        id: exclude
+        env:
+          CHART_PATH: ${{ inputs.chart-path }}
+        run: |
+          # ct discovers charts per --chart-dirs, which can only be the parent of
+          # chart-path, so every chart sitting next to this one is in scope by
+          # default. A repo publishing several charts calls this workflow once per
+          # chart, which would then lint and install every chart on every call -
+          # and, worse than the wasted runner time, apply each call's
+          # --helm-extra-set-args (typically pinning the chart to the image that
+          # call just built) to the other charts too. Excluding the siblings scopes
+          # ct - including its changed-chart detection - to chart-path alone.
+          # ct matches --excluded-charts against the chart directory's base name.
+          # A repo with a single chart produces an empty list here and is unaffected.
+          CHART_PATH="${CHART_PATH%/}"
+          siblings="$(find "$(dirname "${CHART_PATH}")" -mindepth 1 -maxdepth 1 -type d \
+            ! -name "$(basename "${CHART_PATH}")" -printf '%f\n' | sort | paste -sd,)"
+          echo "Excluding charts: ${siblings:-<none>}"
+          echo "siblings=${siblings}" >> "${GITHUB_OUTPUT}"
 
       - name: Run chart-testing (list-changed)
         id: list-changed
         env:
           CHART_DIRS: ${{ inputs.chart-path }}
           TARGET_BRANCH: ${{ inputs.target-branch }}
+          EXCLUDED_CHARTS: ${{ steps.exclude.outputs.siblings }}
         run: |
-          changed=$(ct list-changed --chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}")
+          ARGS=(--chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}")
+          if [ -n "${EXCLUDED_CHARTS}" ]; then
+            ARGS+=(--excluded-charts "${EXCLUDED_CHARTS}")
+          fi
+          changed=$(ct list-changed "${ARGS[@]}")
           if [[ -n "${changed}" ]]; then
             echo "changed=true" >> "${GITHUB_OUTPUT}"
           fi
@@ -247,10 +304,14 @@ jobs:
           INSTALL_CONFIG: ${{ inputs.install-config }}
           INSTALL_ALL: ${{ inputs.install-all }}
           HELM_EXTRA_SET_ARGS: ${{ inputs.helm-extra-set-args }}
+          EXCLUDED_CHARTS: ${{ steps.exclude.outputs.siblings }}
         run: |
           ARGS=(--chart-dirs "$(dirname "${CHART_DIRS}")" --target-branch "${TARGET_BRANCH}")
           if [ -n "${INSTALL_CONFIG}" ]; then
             ARGS+=(--config "${INSTALL_CONFIG}")
+          fi
+          if [ -n "${EXCLUDED_CHARTS}" ]; then
+            ARGS+=(--excluded-charts "${EXCLUDED_CHARTS}")
           fi
           if [ "${INSTALL_ALL}" = "true" ]; then
             ARGS+=(--all)
