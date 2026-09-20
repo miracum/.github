@@ -48,6 +48,16 @@ on:
         required: false
         default: true
         type: boolean
+      image-digest:
+        description: "Digest (sha256:...) of the app image to pin in the packaged chart's values.yaml before bundling, typically the build job's own output (e.g. needs.build.outputs.image-digest) rather than looked up again here. Combined with the tag already at image-tag-path as `<tag>@<digest>`. Only affects the package built for publishing - never committed back to the repo. Leave empty to publish the chart unmodified."
+        required: false
+        default: ""
+        type: string
+      image-tag-path:
+        description: "yq path to the app image tag in the chart's values.yaml, read and then overwritten with `<tag>@<digest>` when image-digest is set."
+        required: false
+        default: ".image.tag"
+        type: string
       target-branch:
         description: "Branch to diff against when detecting changed charts for linting/testing"
         required: false
@@ -394,6 +404,23 @@ jobs:
             echo "version=${VERSION}"
             echo "app-version=${APP_VERSION}"
           } >> "${GITHUB_OUTPUT}"
+
+      - name: Pin app image tag to its digest
+        if: ${{ inputs.image-digest != '' }}
+        working-directory: ${{ inputs.chart-path }}
+        env:
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+          TAG_PATH: ${{ inputs.image-tag-path }}
+        run: |
+          # only ever touches this job's own checked-out working copy - never
+          # committed back. helm package (next step) bundles whatever's on
+          # disk here, so the published chart ends up pinned to the exact
+          # image the caller's build job produced, without values.yaml in
+          # the repo ever changing or a second, possibly-racy lookup of what
+          # the tag currently resolves to.
+          TAG="$(yq "${TAG_PATH}" values.yaml)"
+          yq -i "${TAG_PATH} = \"${TAG}@${IMAGE_DIGEST}\"" values.yaml
+          echo "Pinned ${TAG_PATH} in values.yaml: ${TAG} -> ${TAG}@${IMAGE_DIGEST}"
 
       - name: Package chart
         id: package
