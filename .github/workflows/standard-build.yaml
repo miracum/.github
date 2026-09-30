@@ -281,6 +281,18 @@ jobs:
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
 
+      # a crashed BuildKit daemon only shows up as "error reading from server: EOF"
+      # in the build output - its own logs and container state show why it died
+      # (e.g. a Go panic vs. being OOM-killed).
+      - name: Show BuildKit daemon logs
+        if: ${{ failure() }}
+        env:
+          BUILDKIT_CONTAINER: buildx_buildkit_${{ steps.setup-buildx.outputs.name }}0
+        run: |
+          docker inspect --format 'restarts: {{.RestartCount}}, running: {{.State.Running}}, exit code: {{.State.ExitCode}}, OOM killed: {{.State.OOMKilled}}' "${BUILDKIT_CONTAINER}" || true
+          sudo dmesg | grep -i -E 'out of memory|oom-kill|killed process' | tail -n 5 || true
+          docker logs --tail 300 "${BUILDKIT_CONTAINER}" 2>&1 || true
+
       - name: Upload container image
         if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image == true }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

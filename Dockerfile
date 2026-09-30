@@ -19,7 +19,10 @@ RUN echo "Hello test"
 
 FROM gcr.io/distroless/python3-debian13:nonroot@sha256:8ee214843129f43e2ebf5e0ca9f2e4e6d8292143d1b8a6787f169b5898578884
 WORKDIR /app
-COPY --from=base /app/hello_world.py .
+# copied from the build context rather than `--from=base`: with the final stage
+# depending on base, BuildKit v0.32.2 nondeterministically hung and crashed
+# while "preparing build cache for export" (mode=max registry cache).
+COPY src/hello_world.py .
 USER 65532:65532
 # the distroless python image's entrypoint already is the python interpreter
 CMD [ "/app/hello_world.py" ]
