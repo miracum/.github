@@ -129,6 +129,44 @@ jobs:
         run: |
           docker image ls
 
+      - name: run image
+        env:
+          # on pull requests this is the image loaded above, otherwise it's pulled from the registry
+          IMAGE: ${{ fromJson(needs.build.outputs.image-meta-json).tags[0] }}
+        run: |
+          output="$(docker run --rm "${IMAGE}")"
+          echo "${output}"
+          if [ "${output}" != "Hello World!" ]; then
+            echo "::error::unexpected output from ${IMAGE}"
+            exit 1
+          fi
+
+  # single status check to mark as required in the branch protection rules,
+  # instead of having to keep the list of required checks in sync with the jobs here
+  all-checks-passed:
+    name: all checks passed
+    runs-on: ubuntu-26.04
+    if: ${{ always() }}
+    needs:
+      - build
+      - build-without-test-image
+      - build-with-fixed-image-tags
+      - chart
+      - lint
+      - test
+    permissions: {}
+    steps:
+      - name: Fail if any job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: ${RESULTS}"
+          for result in ${RESULTS}; do
+            if [ "${result}" = "failure" ] || [ "${result}" = "cancelled" ]; then
+              exit 1
+            fi
+          done
+
   release:
     uses: $/.github/workflows/standard-release.yaml
     needs:

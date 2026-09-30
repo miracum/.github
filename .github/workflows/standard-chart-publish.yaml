@@ -24,7 +24,7 @@ on:
         default: "ghcr.io/${{ github.repository }}"
         type: string
       version:
-        description: "Overrides the chart version from Chart.yaml. Passed to `helm package --version`. If unset, a release event uses its tag name and a pull_request event gets a `<chart version>-pr<number>.<short sha>` prerelease version."
+        description: "Overrides the chart version from Chart.yaml. Passed to `helm package --version`. If unset, a release event uses its tag name and a pull_request event gets a `<chart version>-pr<number>-<short head sha>` prerelease version."
         required: false
         default: ""
         type: string
@@ -385,7 +385,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          FULL_SHA: ${{ github.sha }}
+          # the PR's head commit, not github.sha: that's the merge commit GitHub
+          # creates for the run, which doesn't appear anywhere in the PR itself.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           NAME="$(yq '.name' Chart.yaml)"
           if [ -n "${VERSION_OVERRIDE}" ]; then
@@ -394,7 +396,10 @@ jobs:
             # strip an optional leading "v", e.g. v1.2.3 -> 1.2.3
             VERSION="${RELEASE_TAG#v}"
           elif [ "${EVENT_NAME}" = "pull_request" ]; then
-            VERSION="$(yq '.version' Chart.yaml)-pr${PR_NUMBER}.${FULL_SHA:0:7}"
+            # joined with '-' rather than '.': a '.' would make the short sha its
+            # own prerelease identifier, which SemVer rejects if it happens to be
+            # all digits with a leading zero (e.g. 0123456).
+            VERSION="$(yq '.version' Chart.yaml)-pr${PR_NUMBER}-${HEAD_SHA:0:7}"
           else
             VERSION="$(yq '.version' Chart.yaml)"
           fi

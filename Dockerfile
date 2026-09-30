@@ -17,6 +17,9 @@ COPY src/hello_world.py .
 FROM base AS test
 RUN echo "Hello test"
 
-FROM gcr.io/distroless/python3-debian12:nonroot@sha256:7d1042ce588ab97019fe95c24ffca7bc5a82ccdac572511d5e09bda4435c89c5
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:8ee214843129f43e2ebf5e0ca9f2e4e6d8292143d1b8a6787f169b5898578884
+WORKDIR /app
+COPY --from=base /app/hello_world.py .
 USER 65532:65532
-CMD [ "python", "/app/hello_world.py" ]
+# the distroless python image's entrypoint already is the python interpreter
+CMD [ "/app/hello_world.py" ]
