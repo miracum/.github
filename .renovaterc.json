@@ -2,11 +2,15 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>miracum/.github//renovate/default"],
   "autoApprove": true,
-  "automerge": true,
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true
+    },
+    {
+      "description": "v10 needs conventional-changelog-writer 9, which only @semantic-release/release-notes-generator 15 (in beta) uses - semantic-release 25 still bundles 14 and fails to generate release notes with it. Remove once semantic-release bundles a release-notes-generator using writer 9.",
+      "matchPackageNames": ["conventional-changelog-conventionalcommits"],
+      "allowedVersions": "<10"
     }
   ],
   "customManagers": [
@@ -14,12 +18,23 @@
       "customType": "regex",
       "managerFilePatterns": [
         "/^\\.github\\/workflows\\/standard-build\\.yaml$/",
-        "/^\\.github\\/workflows\\/standard-build-bake\\.yaml$/",
-        "/^\\.github\\/workflows\\/standard-lint\\.yaml$/"
+        "/^\\.github\\/workflows\\/standard-chart-publish\\.yaml$/",
+        "/^\\.github\\/workflows\\/standard-lint\\.yaml$/",
+        "/^\\.github\\/workflows\\/standard-schedule\\.yaml$/"
       ],
       "matchStrings": [
         "\\s+# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( extractVersion=(?<extractVersion>.*?))?\\s.+?_VERSION: (?<currentValue>.*)"
       ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github\\/workflows\\/standard-release\\.yaml$/"
+      ],
+      "matchStrings": [
+        "\\s(?<depName>(@[a-z0-9-]+\\/)?[a-z0-9.-]+)@(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s"
+      ],
+      "datasourceTemplate": "npm"
     }
   ]
 }

@@ -69,8 +69,8 @@ jobs:
         uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
         with:
           extra_plugins: |
-            conventional-changelog-conventionalcommits@8.0.0
-            semantic-release-replace-plugin@1.2.0
-            @semantic-release/git@10.0.1
+            conventional-changelog-conventionalcommits@9.3.1
+            semantic-release-replace-plugin@1.2.7
+            @semantic-release/git@11.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.semantic-release-token || steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}

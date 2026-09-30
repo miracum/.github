@@ -24,7 +24,6 @@ jobs:
       id-token: write # for keyless image signing and OIDC-based attestations
       packages: write # to push the image and its attestations to ghcr.io
       pull-requests: write # for the trivy scan PR comment
-      security-events: write # for uploading trivy scan results to the security tab
       attestations: write # to publish build provenance attestations
       artifact-metadata: write # required by actions/attest-build-provenance
     with:
@@ -36,8 +35,6 @@ jobs:
       enable-buildkit-cache-mount-caching: true
       platforms: linux/amd64,linux/arm64
       free-disk-space: true
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-without-test-image:
     uses: $/.github/workflows/standard-build.yaml
@@ -46,15 +43,12 @@ jobs:
       id-token: write # for keyless image signing and OIDC-based attestations
       packages: write # to push the image and its attestations to ghcr.io
       pull-requests: write # for the trivy scan PR comment
-      security-events: write # for uploading trivy scan results to the security tab
       attestations: write # to publish build provenance attestations
       artifact-metadata: write # required by actions/attest-build-provenance
     with:
       image: ghcr.io/miracum/github-reusable-workflow-without-test-image
       enable-build-test-layer: false
       enable-upload-test-image: false
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-with-fixed-image-tags:
     uses: $/.github/workflows/standard-build.yaml
@@ -63,7 +57,6 @@ jobs:
       id-token: write # for keyless image signing and OIDC-based attestations
       packages: write # to push the image and its attestations to ghcr.io
       pull-requests: write # for the trivy scan PR comment
-      security-events: write # for uploading trivy scan results to the security tab
       attestations: write # to publish build provenance attestations
       artifact-metadata: write # required by actions/attest-build-provenance
     with:
@@ -72,8 +65,6 @@ jobs:
       enable-upload-test-image: true
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   chart:
     uses: $/.github/workflows/standard-chart-publish.yaml
@@ -88,8 +79,6 @@ jobs:
       # can't use the default "ghcr.io/${{ github.repository }}" since
       # "ghcr.io/miracum/.github/test-chart": invalid reference format"
       registry: ghcr.io/miracum/github-reusable-workflow-chart
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   lint:
     uses: $/.github/workflows/standard-lint.yaml
@@ -100,10 +89,8 @@ jobs:
       security-events: write # for uploading CodeQL and zizmor SARIF results
       actions: read # required by the codeql-analyze/zizmor jobs in standard-lint.yaml
     with:
-      codeql-languages: '["python"]'
+      codeql-languages: '["python", "actions"]'
       enable-codeql: true
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     runs-on: ubuntu-26.04
@@ -141,6 +128,44 @@ jobs:
       - name: list images
         run: |
           docker image ls
+
+      - name: run image
+        env:
+          # on pull requests this is the image loaded above, otherwise it's pulled from the registry
+          IMAGE: ${{ fromJson(needs.build.outputs.image-meta-json).tags[0] }}
+        run: |
+          output="$(docker run --rm "${IMAGE}")"
+          echo "${output}"
+          if [ "${output}" != "Hello World!" ]; then
+            echo "::error::unexpected output from ${IMAGE}"
+            exit 1
+          fi
+
+  # single status check to mark as required in the branch protection rules,
+  # instead of having to keep the list of required checks in sync with the jobs here
+  all-checks-passed:
+    name: all checks passed
+    runs-on: ubuntu-26.04
+    if: ${{ always() }}
+    needs:
+      - build
+      - build-without-test-image
+      - build-with-fixed-image-tags
+      - chart
+      - lint
+      - test
+    permissions: {}
+    steps:
+      - name: Fail if any job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: ${RESULTS}"
+          for result in ${RESULTS}; do
+            if [ "${result}" = "failure" ] || [ "${result}" = "cancelled" ]; then
+              exit 1
+            fi
+          done
 
   release:
     uses: $/.github/workflows/standard-release.yaml

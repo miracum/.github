@@ -17,20 +17,26 @@ on:
         default: "['ghcr.io/${{ github.repository }}:latest']"
     secrets:
       github-token:
-        description: "The GitHub workflow token used to push to ghcr.io. Also used by MegaLinter"
-        required: true
+        description: "Optional token override for the link checker's GitHub API requests. Defaults to the link check job's own `github.token`, which is scoped to that job's permissions."
+        required: false
 
 env:
-  TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
-  TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
+  # renovate: datasource=github-releases depName=aquasecurity/trivy
+  TRIVY_VERSION: 0.74.0
 
 jobs:
   check-links:
     name: check links using lychee
     runs-on: ubuntu-26.04
     permissions:
+      contents: read
       issues: write # to open/update the link check report issue
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -54,7 +60,7 @@ jobs:
           args: "--cache --max-cache-age 3d --exclude-all-private ."
           failIfEmpty: false
         env:
-          GITHUB_TOKEN: ${{secrets.github-token}}
+          GITHUB_TOKEN: ${{ secrets.github-token || github.token }}
 
       - name: Look for an existing issue
         id: last-issue
@@ -76,22 +82,33 @@ jobs:
     name: scan images with trivy
     runs-on: ubuntu-26.04
     strategy:
+      fail-fast: false
       matrix:
         image: ${{ fromJSON(inputs.images) }}
     permissions:
       contents: read # for actions/checkout to fetch code
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v${{ env.TRIVY_VERSION }}
           image-ref: "${{ matrix.image }}"
-          format: "template"
-          template: "@/contrib/sarif.tpl"
+          format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
+          # without this, the action drops the severity filter for SARIF output
+          limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           sarif_file: "trivy-results.sarif"
+          # one category per image: uploads sharing a category replace each
+          # other, which would leave only the last matrix image's results.
+          category: "trivy-${{ matrix.image }}"
