@@ -347,7 +347,17 @@ jobs:
     runs-on: ubuntu-26.04
     needs:
       - lint
-    if: ${{ github.event_name == 'release' || (github.event_name == 'pull_request' && inputs.enable-pr-release) }}
+      - install
+    # waits for install so a chart that fails to install is never published, but
+    # still runs when install was skipped (enable-install: false). !cancelled()
+    # is needed for that: without a status function, a skipped needs skips this too.
+    if: >-
+      ${{
+        !cancelled()
+        && needs.lint.result == 'success'
+        && (needs.install.result == 'success' || needs.install.result == 'skipped')
+        && (github.event_name == 'release' || (github.event_name == 'pull_request' && inputs.enable-pr-release))
+      }}
     permissions:
       contents: read
       packages: write # to push the chart and its signature/attestation to ghcr.io
@@ -369,6 +379,16 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+
+      - name: Add extra Helm chart repositories
+        if: ${{ inputs.extra-helm-repos != '' }}
+        env:
+          EXTRA_REPOS: ${{ inputs.extra-helm-repos }}
+        run: |
+          while IFS='=' read -r name url; do
+            [ -z "${name}" ] && continue
+            helm repo add "${name}" "${url}"
+          done <<< "${EXTRA_REPOS}"
 
       - name: Update chart dependencies
         if: ${{ inputs.enable-dependency-update }}

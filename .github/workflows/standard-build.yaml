@@ -75,7 +75,7 @@ on:
         default: false
         type: boolean
       enable-build-cache:
-        description: "If enabled, caches image layers across builds by pushing/pulling a `<image>:buildcache` tag to/from the same registry the built image itself is pushed to. Disable for Dockerfiles that get more value from enable-buildkit-cache-mount-caching than from layer caching, to skip the extra registry round-trip."
+        description: "If enabled, caches image layers across builds by pushing/pulling a `<image>:buildcache` tag (and `<image>:buildcache-test` for the test layer) to/from the same registry the built image itself is pushed to. Disable for Dockerfiles that get more value from enable-buildkit-cache-mount-caching than from layer caching, to skip the extra registry round-trip."
         required: false
         default: true
         type: boolean
@@ -221,8 +221,11 @@ jobs:
           outputs: type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
-          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          cache-to: ${{ inputs.enable-build-cache && (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          # a separate cache ref from the main image build below: both export to the
+          # registry, so sharing one ref would let the main build's export replace
+          # this one and the layers only the test stage uses would never be cached.
+          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache-test', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache-test,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
           target: test
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
@@ -366,6 +369,39 @@ jobs:
           template: "@trivy-pr-report.md.tpl"
           output: trivy-pr-report.md
           ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+
+      # GitHub rejects comments longer than 65536 characters, which the detail
+      # tables for an image with many vulnerabilities can exceed.
+      - name: Check PR comment size
+        id: pr-report-size
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
+        run: |
+          # bytes are at least as many as characters, and the margin leaves room
+          # for the marker the sticky comment action adds.
+          if [ "$(wc -c < trivy-pr-report.md)" -gt 65000 ]; then
+            echo "too-large=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Upload full trivy report
+        id: upload-pr-report
+        if: ${{ steps.pr-report-size.outputs.too-large == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.slugify-image.outputs.slug }}-trivy-pr-report
+          path: trivy-pr-report.md
+
+      - name: Replace the PR comment's detail tables with a link to the full report
+        if: ${{ steps.pr-report-size.outputs.too-large == 'true' }}
+        env:
+          ARTIFACT_URL: ${{ steps.upload-pr-report.outputs.artifact-url }}
+        run: |
+          # the headings hold the per-target summary (e.g. vulnerability counts by severity)
+          summary="$(grep -E '^<h[234]>' trivy-pr-report.md)"
+          {
+            echo "${summary}"
+            echo ""
+            echo "<p>The detailed report is too large for a PR comment: <a href=\"${ARTIFACT_URL}\">download the full report</a>.</p>"
+          } > trivy-pr-report.md
 
       - name: Add trivy report PR comment
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
