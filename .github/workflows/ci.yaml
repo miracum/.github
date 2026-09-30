@@ -89,7 +89,7 @@ jobs:
       security-events: write # for uploading CodeQL and zizmor SARIF results
       actions: read # required by the codeql-analyze/zizmor jobs in standard-lint.yaml
     with:
-      codeql-languages: '["python"]'
+      codeql-languages: '["python", "actions"]'
       enable-codeql: true
 
   test:

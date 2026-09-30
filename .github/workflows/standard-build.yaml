@@ -130,6 +130,10 @@ jobs:
       test-image-meta-json: ${{ steps.tests_image_meta.outputs.json }}
       test-image-digest: ${{ steps.build_test.outputs.digest }}
       image-slug: ${{ steps.slugify-image.outputs.slug }}
+    env:
+      # false only for pull requests from forks: their token is read-only and they
+      # get no secrets, so nothing can be pushed to the registry or commented.
+      CAN_WRITE: ${{ github.event_name != 'pull_request' || github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -163,7 +167,7 @@ jobs:
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name) }}
+        if: ${{ env.CAN_WRITE == 'true' }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -225,7 +229,7 @@ jobs:
           # registry, so sharing one ref would let the main build's export replace
           # this one and the layers only the test stage uses would never be cached.
           cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache-test', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          cache-to: ${{ inputs.enable-build-cache && (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache-test,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache-test,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
           target: test
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
@@ -263,7 +267,7 @@ jobs:
           load: ${{ github.event_name == 'pull_request' }}
           outputs: |
             type=oci,dest=./image.tar,oci-mediatypes=true,compression=zstd,force-compression=true
-            ${{ (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || '' }}
+            ${{ env.CAN_WRITE == 'true' && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || '' }}
           sbom: ${{ github.event_name != 'pull_request' }}
           # mode=max records the complete build definition (LLB, Dockerfile, source
           # maps) instead of just the materials and source revision, but that also
@@ -273,7 +277,7 @@ jobs:
           tags: ${{ steps.image_meta.outputs.tags }}
           labels: ${{ steps.image_meta.outputs.labels }}
           cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          cache-to: ${{ inputs.enable-build-cache && (github.event_name != 'pull_request' || (github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name)) && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
 
@@ -406,7 +410,7 @@ jobs:
       - name: Add trivy report PR comment
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         # when running from a fork, the CI token doesn't have enough permissions to create PR comments
-        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan && env.CAN_WRITE == 'true' }}
         with:
           recreate: true
           header: "trivy-report-comment-${{ steps.slugify-image.outputs.slug }}"
@@ -550,7 +554,7 @@ jobs:
           echo "Attest vulnerability report for '$IMAGE' using keyless approach"
           cosign attest --yes --type vuln --predicate /tmp/trivy-vuln-attestation.json "$IMAGE"
 
-  upload-attestion-to-release:
+  upload-attestation-to-release:
     name: upload slsa attestations to release assets
     runs-on: ubuntu-26.04
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
@@ -589,6 +593,7 @@ jobs:
   upload-sbom-to-release:
     name: upload image SBOMs to release assets
     runs-on: ubuntu-26.04
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build
     permissions:
@@ -611,7 +616,6 @@ jobs:
       - name: upload assets to release
         # zizmor: ignore[superfluous-actions] upload release assets directly
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
           fail_on_unmatched_files: true
           files: |

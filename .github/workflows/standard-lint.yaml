@@ -20,9 +20,9 @@ on:
         default: true
         type: boolean
       codeql-languages:
-        description: "Languages to run CodeQL analysis for. CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]"
+        description: "JSON array of languages to run CodeQL analysis for, e.g. '[\"java\", \"python\"]'. See <https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/> for the supported ones. The default only analyzes the repository's GitHub Actions workflows, which every repository calling this has."
         required: false
-        default: '["java", "csharp", "python"]'
+        default: '["actions"]'
         type: string
       enable-validate-gradle-wrapper:
         description: "Enable Gradle wrapper validation"
@@ -30,14 +30,14 @@ on:
         default: true
         type: boolean
       java-version:
-        description: "The Java version to use by the CodeQL action"
+        description: "The Java version CodeQL uses to resolve the dependencies of java code"
         required: false
         default: "21"
         type: string
       dotnet-version:
-        description: "The .NET version to use by the CodeQL action"
+        description: "The .NET version CodeQL uses to resolve the dependencies of csharp code"
         required: false
-        default: "9.0.x"
+        default: "10.0.x"
         type: string
     secrets:
       github-token:
@@ -171,7 +171,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Java
-        if: ${{ matrix.language == 'java' }}
+        if: ${{ contains(fromJSON('["java", "java-kotlin", "kotlin"]'), matrix.language) }}
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: ${{ inputs.java-version }}
@@ -184,42 +184,27 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
-      # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           languages: ${{ matrix.language }}
-          # If you wish to specify custom queries, you can do so here or in a config file.
-          # By default, queries listed here will override any specified in a config file.
-          # Prefix the list here with "+" to use these queries and those in the config file.
-
-          # Details on CodeQL's query packs refer to : https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
+          # analyze the source without building it wherever CodeQL supports that
+          # (all interpreted languages, java, csharp, c-cpp and rust). go and kotlin
+          # can't be analyzed without a build, so CodeQL builds those itself.
+          build-mode: ${{ contains(fromJSON('["go", "kotlin"]'), matrix.language) && 'autobuild' || 'none' }}
           queries: +security-extended,security-and-quality
-
-      # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
-      # If this step fails, then you should remove it and run the build manually (see below)
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
-
-      # ℹ️ Command-line programs to run using the OS shell.
-      # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-
-      #   If the Autobuild fails above, remove it and uncomment the following three lines.
-      #   modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.
-
-      # - run: |
-      #   echo "Run, Build Application using script"
-      #   ./location_of_script_within_repo/buildscript.sh
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
-          category: "/language:${{matrix.language}}"
+          category: "/language:${{ matrix.language }}"
 
   zizmor:
     name: zizmor scan
     runs-on: ubuntu-26.04
-    if: ${{ github.event_name == 'pull_request' }}
+    # also runs on the default branch so code scanning has a baseline to compare
+    # the results of pull requests against.
+    if: ${{ github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       security-events: write # for uploading zizmor SARIF results
       contents: read
@@ -264,7 +249,9 @@ jobs:
           sarif_file: results.sarif
           category: zizmor
 
+      # only pull requests are gated on findings, the default branch just uploads its results
       - name: Run zizmor (fail on findings)
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
           uvx "zizmor@${ZIZMOR_VERSION}" --verbose --pedantic --format plain .
         env:
