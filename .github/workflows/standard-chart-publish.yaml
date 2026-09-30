@@ -123,8 +123,8 @@ on:
         description: "The full `registry/chart-name:version` reference of the pushed chart"
     secrets:
       github-token:
-        description: "The GitHub workflow token used to push to ghcr.io"
-        required: true
+        description: "Optional token override for pushing to ghcr.io. Defaults to the publish job's own `github.token`, which is scoped to that job's permissions - only pass this if that token isn't sufficient, e.g. to push to another organization's registry."
+        required: false
 
 jobs:
   lint:
@@ -444,7 +444,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.github-token }}
+          password: ${{ secrets.github-token || github.token }}
 
       - name: Push chart to registry
         id: push

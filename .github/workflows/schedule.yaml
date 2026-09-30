@@ -22,5 +22,3 @@ jobs:
       security-events: write # for uploading trivy scan results to the security tab
     with:
       images: "['ghcr.io/miracum/github-reusable-workflow:master', 'ghcr.io/miracum/github-reusable-workflow:master']"
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}

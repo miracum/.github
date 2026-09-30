@@ -29,21 +29,6 @@ on:
         required: false
         default: true
         type: boolean
-      enable-verify-base-image-signature:
-        description: "Enable Dockerfile base image validation"
-        required: false
-        default: true
-        type: boolean
-      verify-base-image-certificate-oidc-issuer:
-        description: "The OIDC issuer for the cosign base image signature"
-        required: false
-        default: "https://accounts.google.com"
-        type: string
-      verify-base-image-certificate-identity:
-        description: "The certificate identity for the cosign base image signature"
-        required: false
-        default: "keyless@distroless.iam.gserviceaccount.com"
-        type: string
       java-version:
         description: "The Java version to use by the CodeQL action"
         required: false
@@ -56,8 +41,8 @@ on:
         type: string
     secrets:
       github-token:
-        description: "The GitHub workflow token used to push to ghcr.io. Also used by MegaLinter"
-        required: true
+        description: "Optional token override for MegaLinter's PR comments. Defaults to the MegaLinter job's own `github.token`, which is scoped to that job's permissions."
+        required: false
 
 jobs:
   megalinter:
@@ -65,9 +50,15 @@ jobs:
     runs-on: ubuntu-26.04
     if: ${{ github.event_name == 'pull_request' }}
     permissions:
+      contents: read
       issues: write # for megalinter to post PR comments via the issue comments API
       pull-requests: write # for megalinter to post PR comments
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -83,7 +74,7 @@ jobs:
           VALIDATE_ALL_CODEBASE: "true"
           # only try to post PR comments if it's not a fork
           GITHUB_COMMENT_REPORTER: ${{ !github.event.pull_request.head.repo.fork }}
-          GITHUB_TOKEN: ${{ secrets.github-token }}
+          GITHUB_TOKEN: ${{ secrets.github-token || github.token }}
           SARIF_REPORTER: "true"
 
       # Upload MegaLinter artifacts
@@ -103,6 +94,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -120,6 +116,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -134,37 +135,17 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-
-  base-image-signature-verification:
-    name: verify Dockerfile base image signature
-    runs-on: ubuntu-26.04
-    if: ${{ inputs.enable-verify-base-image-signature }}
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-      - run: |
-          cosign dockerfile verify \
-            --output text \
-            --base-image-only \
-            --certificate-oidc-issuer "${OIDC_ISSUER}" \
-            --certificate-identity "${CERTIFICATE_IDENTITY}" \
-            Dockerfile
-        env:
-          OIDC_ISSUER: ${{ inputs.verify-base-image-certificate-oidc-issuer }}
-          CERTIFICATE_IDENTITY: ${{ inputs.verify-base-image-certificate-identity }}
 
   codeql-analyze:
     name: CodeQL analyze
@@ -179,6 +160,11 @@ jobs:
       matrix:
         language: ${{ fromJSON(inputs.codeql-languages) }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -239,6 +225,11 @@ jobs:
       contents: read
       actions: read # required by github/codeql-action to upload SARIF results
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

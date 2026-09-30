@@ -24,7 +24,6 @@ jobs:
       id-token: write # for keyless image signing and OIDC-based attestations
       packages: write # to push the image and its attestations to ghcr.io
       pull-requests: write # for the trivy scan PR comment
-      security-events: write # for uploading trivy scan results to the security tab
       attestations: write # to publish build provenance attestations
       artifact-metadata: write # required by actions/attest-build-provenance
     with:
@@ -36,8 +35,6 @@ jobs:
       enable-buildkit-cache-mount-caching: true
       platforms: linux/amd64,linux/arm64
       free-disk-space: true
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-without-test-image:
     uses: $/.github/workflows/standard-build.yaml
@@ -46,15 +43,12 @@ jobs:
       id-token: write # for keyless image signing and OIDC-based attestations
       packages: write # to push the image and its attestations to ghcr.io
       pull-requests: write # for the trivy scan PR comment
-      security-events: write # for uploading trivy scan results to the security tab
       attestations: write # to publish build provenance attestations
       artifact-metadata: write # required by actions/attest-build-provenance
     with:
       image: ghcr.io/miracum/github-reusable-workflow-without-test-image
       enable-build-test-layer: false
       enable-upload-test-image: false
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   build-with-fixed-image-tags:
     uses: $/.github/workflows/standard-build.yaml
@@ -63,7 +57,6 @@ jobs:
       id-token: write # for keyless image signing and OIDC-based attestations
       packages: write # to push the image and its attestations to ghcr.io
       pull-requests: write # for the trivy scan PR comment
-      security-events: write # for uploading trivy scan results to the security tab
       attestations: write # to publish build provenance attestations
       artifact-metadata: write # required by actions/attest-build-provenance
     with:
@@ -72,8 +65,6 @@ jobs:
       enable-upload-test-image: true
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   chart:
     uses: $/.github/workflows/standard-chart-publish.yaml
@@ -88,8 +79,6 @@ jobs:
       # can't use the default "ghcr.io/${{ github.repository }}" since
       # "ghcr.io/miracum/.github/test-chart": invalid reference format"
       registry: ghcr.io/miracum/github-reusable-workflow-chart
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   lint:
     uses: $/.github/workflows/standard-lint.yaml
@@ -102,8 +91,6 @@ jobs:
     with:
       codeql-languages: '["python"]'
       enable-codeql: true
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     runs-on: ubuntu-26.04
