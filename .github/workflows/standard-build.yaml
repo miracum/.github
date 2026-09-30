@@ -10,8 +10,6 @@ defaults:
 env:
   # renovate: datasource=github-releases depName=aquasecurity/trivy
   TRIVY_VERSION: 0.74.0
-  TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
-  TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
 
 on:
   workflow_call:
@@ -285,26 +283,52 @@ jobs:
         run: |
           docker image ls -a
 
-      #
-      - name: install trivy
-        run: |
-          wget "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb"
-          sudo dpkg -i "trivy_${TRIVY_VERSION}_Linux-64bit.deb"
+      # the first trivy-action call installs trivy and restores the trivy DB cache
+      # into the (shared) default cache-dir. Subsequent calls reuse both instead of
+      # re-running setup-trivy and each trying to save the same cache entry again.
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TMPDIR: /tmp
+        with:
+          version: v${{ env.TRIVY_VERSION }}
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          format: cyclonedx
+          output: ${{ steps.slugify-image.outputs.slug }}-sbom.cdx.json
+
+      - name: Generate SPDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TMPDIR: /tmp
+        with:
+          skip-setup-trivy: true
+          cache: false
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          format: spdx-json
+          output: ${{ steps.slugify-image.outputs.slug }}-sbom.spdx.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.slugify-image.outputs.slug }}-sboms
+          path: |
+            ${{ steps.slugify-image.outputs.slug }}-sbom.cdx.json
+            ${{ steps.slugify-image.outputs.slug }}-sbom.spdx.json
 
       - name: Create Trivy vulnerability attestation
         if: ${{ inputs.enable-trivy-scan }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
-          IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
           TMPDIR: /tmp
-        run: |
-          trivy image \
-            --exit-code=0 \
-            --format=cosign-vuln \
-            --output=trivy-vuln-attestation.json \
-            --ignore-unfixed="${TRIVY_IGNORE_UNFIXED}" \
-            "${IMAGE_TO_SCAN}"
+        with:
+          skip-setup-trivy: true
+          cache: false
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          exit-code: "0"
+          format: cosign-vuln
+          output: trivy-vuln-attestation.json
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Upload image vulnerability attestation
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -321,19 +345,18 @@ jobs:
 
       - name: Run Trivy vulnerability scanner for PR comment
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
-          IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
-          TMPDIR: /tmp
-        run: |
-          trivy image \
-            --exit-code=0 \
-            --format=template \
-            --output=trivy-pr-report.md \
-            --template="@trivy-pr-report.md.tpl" \
-            --ignore-unfixed="${TRIVY_IGNORE_UNFIXED}" \
-            "${IMAGE_TO_SCAN}"
+        with:
+          skip-setup-trivy: true
+          cache: false
+          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          exit-code: "0"
+          format: template
+          template: "@trivy-pr-report.md.tpl"
+          output: trivy-pr-report.md
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Add trivy report PR comment
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
@@ -343,23 +366,6 @@ jobs:
           recreate: true
           header: "trivy-report-comment-${{ steps.slugify-image.outputs.slug }}"
           path: trivy-pr-report.md
-
-      - name: Generate SBOMs
-        env:
-          IMAGE_TO_SCAN: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
-          IMAGE_SLUG: ${{ steps.slugify-image.outputs.slug }}
-          TMPDIR: /tmp
-        run: |
-          mkdir -p sboms/
-          trivy image --format cyclonedx -o "sboms/$IMAGE_SLUG-sbom.cdx.json" "$IMAGE_TO_SCAN"
-          trivy image --format spdx-json -o "sboms/$IMAGE_SLUG-sbom.spdx.json" "$IMAGE_TO_SCAN"
-
-      - name: Upload SBOMs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ steps.slugify-image.outputs.slug }}-sboms
-          path: |
-            ./sboms/
 
     # requires content: write access
     #   - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
