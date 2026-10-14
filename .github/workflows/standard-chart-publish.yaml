@@ -73,6 +73,11 @@ on:
         required: false
         default: true
         type: boolean
+      enable-docs-lint:
+        description: "If enabled, re-generates chart-path's README.md with generate-docs.sh from kube-powertools (chart-doc-gen if the chart has a doc.yaml, helm-docs otherwise, followed by prettier) and fails if the result differs from what's committed, i.e. if the docs are outdated or missing."
+        required: false
+        default: true
+        type: boolean
       enable-install:
         description: "If enabled, spins up a kind cluster and installs chart-path with ct install when it changed vs. target-branch"
         required: false
@@ -235,6 +240,44 @@ jobs:
           fi
           ct lint "${ARGS[@]}"
 
+  lint-docs:
+    name: lint chart docs
+    runs-on: ubuntu-26.04
+    if: ${{ inputs.enable-docs-lint }}
+    # no harden-runner here: it skips itself in container jobs on GitHub-hosted runners.
+    container: ghcr.io/chgl/kube-powertools:v2.6.13@sha256:5e6cab6409850248d60d3686f02bf903f5f25aa8aa72058031aa5427d7f1c5cf
+    steps:
+      - name: Add workspace as safe directory
+        run: |
+          # the container runs as root, but the checked-out workspace is owned
+          # by the runner's user, so git refuses to operate on it otherwise.
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check if documentation is up-to-date
+        env:
+          CHART_PATH: ${{ inputs.chart-path }}
+        run: |
+          CHART_PATH="${CHART_PATH%/}"
+          # generate-docs.sh regenerates every chart in CHARTS_DIR, which can only
+          # be the parent of chart-path, so the charts next to it are regenerated
+          # too - but only chart-path's docs are checked, same as the lint job.
+          CHARTS_DIR="$(dirname "${CHART_PATH}")" generate-docs.sh
+          # so a README.md generated for a chart that has none committed yet
+          # shows up in the diff, instead of being ignored as untracked.
+          git add --intent-to-add -- "${CHART_PATH}"
+          if git diff --quiet HEAD -- "${CHART_PATH}"; then
+            echo -e "\033[0;32mDocumentation up to date\033[0m ✔"
+          else
+            echo -e "\033[0;31mDocumentation outdated! Please run generate-docs.sh from ghcr.io/chgl/kube-powertools locally and push the changes.\033[0m ❌"
+            git diff --color HEAD -- "${CHART_PATH}"
+            exit 1
+          fi
+
   install:
     name: install charts (k8s ${{ matrix.k8s-version }})
     runs-on: ubuntu-26.04
@@ -329,14 +372,17 @@ jobs:
     runs-on: ubuntu-26.04
     needs:
       - lint
+      - lint-docs
       - install
-    # waits for install so a chart that fails to install is never published, but
-    # still runs when install was skipped (enable-install: false). !cancelled()
-    # is needed for that: without a status function, a skipped needs skips this too.
+    # waits for lint-docs and install so a chart with outdated docs or that fails
+    # to install is never published, but still runs when they were skipped
+    # (enable-docs-lint/enable-install: false). !cancelled() is needed for that:
+    # without a status function, a skipped needs skips this too.
     if: >-
       ${{
         !cancelled()
         && needs.lint.result == 'success'
+        && (needs.lint-docs.result == 'success' || needs.lint-docs.result == 'skipped')
         && (needs.install.result == 'success' || needs.install.result == 'skipped')
         && (github.event_name == 'release' || (github.event_name == 'pull_request' && inputs.enable-pr-release))
       }}
