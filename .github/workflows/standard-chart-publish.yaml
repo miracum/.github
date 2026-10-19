@@ -58,6 +58,11 @@ on:
         required: false
         default: ".image.tag"
         type: string
+      images:
+        description: "For charts deploying more than one app image: newline-separated `<yq path>=<value>` pairs, each overwriting the image tag at `<yq path>` in the chart's values.yaml before bundling. `<value>` is either `<tag>`, `<tag>@<digest>` (replaces the tag, e.g. to point a PR's chart at the PR's images), or `@<digest>` (keeps the tag already at the path, dropping any digest it already had, and appends this one - like image-digest does for image-tag-path). The split happens at the last `=`, so the path itself may contain one (e.g. a `select(.name == \"x\")`). Fails if a path doesn't exist in values.yaml. Applied after image-digest. Like image-digest, only affects the package built for publishing - never committed back to the repo."
+        required: false
+        default: ""
+        type: string
       target-branch:
         description: "Branch to diff against when detecting changed charts for linting/testing"
         required: false
@@ -478,6 +483,39 @@ jobs:
           TAG="$(yq "${TAG_PATH}" values.yaml)"
           yq -i "${TAG_PATH} = \"${TAG}@${IMAGE_DIGEST}\"" values.yaml
           echo "Pinned ${TAG_PATH} in values.yaml: ${TAG} -> ${TAG}@${IMAGE_DIGEST}"
+
+      - name: Set app image tags
+        if: ${{ inputs.images != '' }}
+        working-directory: ${{ inputs.chart-path }}
+        env:
+          IMAGES: ${{ inputs.images }}
+        run: |
+          # same as the previous step: only this job's own working copy is ever modified.
+          while IFS= read -r line; do
+            # skip blank lines, e.g. the trailing one of a YAML block scalar
+            [ -z "${line//[[:space:]]/}" ] && continue
+            # split at the last '=': tags and digests can't contain one, but yq paths can.
+            path="${line%=*}"
+            value="${line##*=}"
+            if [[ "${line}" != *=* ]] || [ -z "${path}" ] || [ -z "${value}" ]; then
+              echo "::error::Invalid 'images' entry '${line}': expected '<yq path>=<value>'"
+              exit 1
+            fi
+            current="$(yq "${path}" values.yaml)"
+            if [ "${current}" = "null" ]; then
+              echo "::error::'images' path '${path}' doesn't exist in values.yaml"
+              exit 1
+            fi
+            if [[ "${value}" == @* ]]; then
+              # keep the existing tag, but drop any digest it was already pinned to
+              updated="${current%%@*}${value}"
+            else
+              updated="${value}"
+            fi
+            # passed via strenv() rather than interpolated, so the value can't break out of the expression
+            UPDATED="${updated}" yq -i "${path} = strenv(UPDATED)" values.yaml
+            echo "Set ${path} in values.yaml: ${current} -> ${updated}"
+          done <<< "${IMAGES}"
 
       - name: Package chart
         id: package
