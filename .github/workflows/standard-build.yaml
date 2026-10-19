@@ -228,8 +228,12 @@ jobs:
           # a separate cache ref from the main image build below: both export to the
           # registry, so sharing one ref would let the main build's export replace
           # this one and the layers only the test stage uses would never be cached.
+          #
+          # the cache export must use the same compression as the outputs: exporting a
+          # gzip cache (the default) of force-compressed zstd layers makes BuildKit's
+          # memory balloon until it is OOM-killed ("error reading from server: EOF").
           cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache-test', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache-test,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache-test,mode=max,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image) || '' }} # zizmor: ignore[template-injection]
           target: test
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
@@ -277,7 +281,8 @@ jobs:
           tags: ${{ steps.image_meta.outputs.tags }}
           labels: ${{ steps.image_meta.outputs.labels }}
           cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          # same compression as the outputs - see the cache-to comment of the test layer build
+          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache,mode=max,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image) || '' }} # zizmor: ignore[template-injection]
           platforms: ${{ inputs.platforms }}
           build-args: ${{ inputs.build-args }}
 
