@@ -311,11 +311,13 @@ jobs:
           IMAGE_TAR: ${{ github.workspace }}/image.tar
         run: |
           index="$(tar -xOf "${IMAGE_TAR}" index.json)"
-          if [ "$(jq '.manifests | length' <<<"${index}")" != "1" ]; then
-            echo "::error::expected exactly one manifest in the OCI tarball's index.json, got: ${index}"
+          # the index contains one entry per tag, all referencing the same manifest
+          digests="$(jq -r '[.manifests[].digest] | unique | .[]' <<<"${index}")"
+          if [ "$(wc -l <<<"${digests}")" != "1" ] || [ -z "${digests}" ]; then
+            echo "::error::expected exactly one manifest digest in the OCI tarball's index.json, got: ${index}"
             exit 1
           fi
-          digest="$(jq -r '.manifests[0].digest' <<<"${index}")"
+          digest="${digests}"
           echo "image digest: ${digest}"
           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
 
