@@ -97,9 +97,34 @@ jobs:
     name: test
     needs:
       - build
+    permissions:
+      contents: read
+      packages: read # to resolve the pushed image's digest in ghcr.io
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        # forked PRs can't push, so there's nothing in the registry to check
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # the image-digest output is used to pin images by digest, e.g. in Helm charts, so it must
+      # refer to the image that was actually pushed - not, e.g., to the one loaded into the build
+      # job's local Docker daemon on pull requests.
+      - name: Check image-digest output exists in the registry
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          IMAGE: ${{ fromJson(needs.build.outputs.image-meta-json).tags[0] }}
+          IMAGE_DIGEST: ${{ needs.build.outputs.image-digest }}
+        run: |
+          # strip the tag, keeping a registry port's colon intact
+          image_name="${IMAGE%:*}"
+          docker buildx imagetools inspect "${image_name}@${IMAGE_DIGEST}"
 
       - name: Download build image
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

@@ -124,7 +124,7 @@ jobs:
       image-version: ${{ steps.image_meta.outputs.version }}
       image-tags: ${{ steps.image_meta.outputs.tags }}
       image-meta-json: ${{ steps.image_meta.outputs.json }}
-      image-digest: ${{ steps.build.outputs.digest }}
+      image-digest: ${{ steps.image_digest.outputs.digest }}
       test-image-version: ${{ steps.tests_image_meta.outputs.version }}
       test-image-tags: ${{ steps.tests_image_meta.outputs.tags }}
       test-image-meta-json: ${{ steps.tests_image_meta.outputs.json }}
@@ -297,6 +297,27 @@ jobs:
           docker inspect --format 'restarts: {{.RestartCount}}, running: {{.State.Running}}, exit code: {{.State.ExitCode}}, OOM killed: {{.State.OOMKilled}}' "${BUILDKIT_CONTAINER}" || true
           sudo dmesg | grep -i -E 'out of memory|oom-kill|killed process' | tail -n 5 || true
           docker logs --tail 300 "${BUILDKIT_CONTAINER}" 2>&1 || true
+
+      # the build step's own `digest` output can't be used as the image digest: with more than one
+      # exporter, buildx reports only one of their digests, and on pull requests that is the one of
+      # the image loaded into the local Docker daemon. `load` creates its own implicit exporter that
+      # does not inherit the compression and media types of the explicit outputs, so its manifest -
+      # and digest - differs from the pushed one, and the reported digest doesn't exist in the
+      # registry. The OCI tarball is exported with the exact same settings as the registry push
+      # (including the attestations on non-PR builds), so its digest is the one of the pushed image.
+      - name: Determine image digest
+        id: image_digest
+        env:
+          IMAGE_TAR: ${{ github.workspace }}/image.tar
+        run: |
+          index="$(tar -xOf "${IMAGE_TAR}" index.json)"
+          if [ "$(jq '.manifests | length' <<<"${index}")" != "1" ]; then
+            echo "::error::expected exactly one manifest in the OCI tarball's index.json, got: ${index}"
+            exit 1
+          fi
+          digest="$(jq -r '.manifests[0].digest' <<<"${index}")"
+          echo "image digest: ${digest}"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload container image
         if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image == true }}
