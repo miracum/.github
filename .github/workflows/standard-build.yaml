@@ -74,6 +74,11 @@ on:
         required: false
         default: false
         type: boolean
+      buildkit-cache-mount-key-files:
+        description: "Newline-separated glob patterns (relative to the repository root) of files that are hashed into the enable-buildkit-cache-mount-caching cache key, in addition to the Dockerfile. List the files that decide what ends up in the cache mounts, e.g. `src/**/*.gradle` or `**/packages.lock.json`: an exact cache hit is never saved again, so without them the cache is only refreshed when the Dockerfile changes and every dependency update since then is downloaded again on every build."
+        required: false
+        default: ""
+        type: string
       enable-build-cache:
         description: "If enabled, caches image layers across builds by pushing/pulling a `<image>:buildcache` tag (and `<image>:buildcache-test` for the test layer) to/from the same registry the built image itself is pushed to. Disable for Dockerfiles that get more value from enable-buildkit-cache-mount-caching than from layer caching, to skip the extra registry round-trip."
         required: false
@@ -197,7 +202,9 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: buildkit-cache-mount
-          key: buildkit-cache-mount-${{ runner.os }}-${{ inputs.image }}-${{ hashFiles(format('{0}/Dockerfile', inputs.build-context)) }}
+          # falls back to the Dockerfile again rather than passing an empty pattern when no key files
+          # are set. hashFiles hashes each matched file once, so those callers keep their current key.
+          key: buildkit-cache-mount-${{ runner.os }}-${{ inputs.image }}-${{ hashFiles(format('{0}/Dockerfile', inputs.build-context), inputs.buildkit-cache-mount-key-files || format('{0}/Dockerfile', inputs.build-context)) }}
           restore-keys: |
             buildkit-cache-mount-${{ runner.os }}-${{ inputs.image }}-
 

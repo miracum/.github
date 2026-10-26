@@ -113,6 +113,11 @@ on:
         required: false
         default: true
         type: boolean
+      enable-publish:
+        description: "If disabled, never publishes the chart, only lints and installs it. Lets a caller split testing and publishing into two calls of this workflow, e.g. to install the chart in parallel with other, slower tests while still only publishing it once those passed: call it once with `enable-publish: false`, then again with `enable-install: false` and `enable-docs-lint: false` from a job that `needs` the first call and the other tests."
+        required: false
+        default: true
+        type: boolean
       extra-helm-repos:
         description: "Extra Helm chart repositories to add before linting/testing/packaging, as newline-separated 'name=url' pairs"
         required: false
@@ -389,6 +394,7 @@ jobs:
         && needs.lint.result == 'success'
         && (needs.lint-docs.result == 'success' || needs.lint-docs.result == 'skipped')
         && (needs.install.result == 'success' || needs.install.result == 'skipped')
+        && inputs.enable-publish
         && (github.event_name == 'release' || (github.event_name == 'pull_request' && inputs.enable-pr-release))
       }}
     permissions:
