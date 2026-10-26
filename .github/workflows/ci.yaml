@@ -62,7 +62,9 @@ jobs:
     with:
       image: ghcr.io/miracum/github-reusable-workflow-with-fixed-image-tags
       enable-build-test-layer: true
-      enable-upload-test-image: true
+      # nothing uses this job's test image, so it covers building a test layer that isn't exported,
+      # while the build job above covers uploading it.
+      enable-upload-test-image: false
       image-tags: |
         type=semver,pattern={{raw}},value=v1.2.3-beta.123
 

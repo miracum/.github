@@ -105,7 +105,7 @@ on:
         description: "The test image meta data in JSON format"
       test-image-digest:
         value: ${{ jobs.build.outputs.test-image-digest }}
-        description: "The test image digest"
+        description: "The test image digest. Empty unless enable-upload-test-image is set, since the test image is only exported then."
       test-image-version:
         value: ${{ jobs.build.outputs.test-image-version }}
         description: "The built image version"
@@ -228,8 +228,11 @@ jobs:
         with:
           context: ${{ inputs.build-context }} # zizmor: ignore[template-injection]
           push: false
-          load: true
-          outputs: type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true
+          # only exported when it's uploaded below. Otherwise the test layer is only built for the tests
+          # it runs, and exporting the whole image (twice: into the Docker daemon and as a tarball)
+          # would add over 30s to every build for an image nothing uses.
+          load: ${{ inputs.enable-upload-test-image }}
+          outputs: ${{ inputs.enable-upload-test-image && 'type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true' || 'type=cacheonly' }}
           tags: ${{ steps.tests_image_meta.outputs.tags }}
           labels: ${{ steps.tests_image_meta.outputs.labels }}
           # a separate cache ref from the main image build below: both export to the
