@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.14.7-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS base
+FROM docker.io/library/python:3.14.7-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS base
 ENV DEBIAN_FRONTEND=noninteractive
 # cache mounts here exist to dogfood standard-build.yaml's
 # enable-buildkit-cache-mount-caching input, not because this trivial
@@ -17,7 +17,7 @@ COPY src/hello_world.py .
 FROM base AS test
 RUN echo "Hello test"
 
-FROM gcr.io/distroless/python3-debian13:nonroot@sha256:8ee214843129f43e2ebf5e0ca9f2e4e6d8292143d1b8a6787f169b5898578884
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:1c32c3720dc4c7f0c7dbe998737f32c200add6511eca7cec705008be488b87d6
 WORKDIR /app
 # copied from the build context rather than `--from=base`: with the final stage
 # depending on base, BuildKit v0.32.2 nondeterministically hung and crashed
