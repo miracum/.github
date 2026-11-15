@@ -10,6 +10,9 @@ defaults:
 env:
   # renovate: datasource=github-releases depName=aquasecurity/trivy
   TRIVY_VERSION: 0.74.0
+  # false only for pull requests from forks: their token is read-only and they
+  # get no secrets, so nothing can be pushed to the registry or commented.
+  CAN_WRITE: ${{ github.event_name != 'pull_request' || github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name }}
 
 on:
   workflow_call:
@@ -29,7 +32,7 @@ on:
         required: false
         type: string
       enable-upload-image:
-        description: "If enabled, upload the image as a build artifact"
+        description: "If enabled, upload the image built on pull requests as a build artifact: an OCI archive called `image.tar` in an artifact named after the image-slug output. That artifact holds a single platform: `linux/amd64` if it is one of the platforms, otherwise the first one. The images of any other platforms are uploaded as `<image-slug>-<platform>`, e.g. `<image-slug>-linux-arm64`."
         required: false
         default: true
         type: boolean
@@ -39,7 +42,7 @@ on:
         default: false
         type: boolean
       enable-upload-test-image:
-        description: "If enabled, uploads the image built from the test layer as an artifact."
+        description: "If enabled, uploads the image built from the test layer as an artifact called `<image-slug>-test`. Like the image artifact it holds a single platform, with any other platforms uploaded as `<image-slug>-test-<platform>` - see enable-upload-image."
         required: false
         default: false
         type: boolean
@@ -59,11 +62,16 @@ on:
         default: ""
         type: string
       platforms:
-        description: "List of target platforms for build"
+        description: "Comma- or newline-separated list of target platforms for build. Each platform is built by its own job, on the runner the platform-runners input maps it to, and the results are combined into one multi-platform image."
         required: false
         type: string
         default: |
           linux/amd64
+      platform-runners:
+        description: "JSON object mapping a target platform to the label of a runner of that platform's architecture, which builds it natively. Platforms that aren't listed are built on `ubuntu-26.04` using QEMU emulation, which is several times slower - e.g. remove `linux/arm64` if the repository has no access to arm64 runners."
+        required: false
+        type: string
+        default: '{"linux/amd64": "ubuntu-26.04", "linux/arm64": "ubuntu-26.04-arm"}'
       free-disk-space:
         description: remove unneeded packages
         required: false
@@ -80,37 +88,37 @@ on:
         default: ""
         type: string
       enable-build-cache:
-        description: "If enabled, caches image layers across builds by pushing/pulling a `<image>:buildcache` tag (and `<image>:buildcache-test` for the test layer) to/from the same registry the built image itself is pushed to. Disable for Dockerfiles that get more value from enable-buildkit-cache-mount-caching than from layer caching, to skip the extra registry round-trip."
+        description: "If enabled, caches image layers across builds by pushing/pulling a `<image>:buildcache-<platform>` tag (and `<image>:buildcache-test-<platform>` for the test layer) per platform, e.g. `<image>:buildcache-linux-amd64`, to/from the same registry the built image itself is pushed to. Disable for Dockerfiles that get more value from enable-buildkit-cache-mount-caching than from layer caching, to skip the extra registry round-trip."
         required: false
         default: true
         type: boolean
     outputs:
       image-tags:
-        value: ${{ jobs.build.outputs.image-tags }}
+        value: ${{ jobs.prepare.outputs.image-tags }}
         description: "The built image tags"
       image-version:
-        value: ${{ jobs.build.outputs.image-version }}
+        value: ${{ jobs.prepare.outputs.image-version }}
         description: "The built image version"
       image-meta-json:
-        value: ${{ jobs.build.outputs.image-meta-json }}
+        value: ${{ jobs.prepare.outputs.image-meta-json }}
         description: "The built image meta data in JSON format"
       image-digest:
-        value: ${{ jobs.build.outputs.image-digest }}
-        description: "The built image digest"
+        value: ${{ jobs.merge.outputs.image-digest }}
+        description: "The digest of the pushed image, covering all of its platforms. On pull requests from forks nothing is pushed, so there it is the digest of the image in the uploaded artifact instead."
       test-image-tags:
-        value: ${{ jobs.build.outputs.test-image-tags }}
+        value: ${{ jobs.prepare.outputs.test-image-tags }}
         description: "The test image tags"
       test-image-meta-json:
-        value: ${{ jobs.build.outputs.test-image-meta-json }}
+        value: ${{ jobs.prepare.outputs.test-image-meta-json }}
         description: "The test image meta data in JSON format"
       test-image-digest:
-        value: ${{ jobs.build.outputs.test-image-digest }}
-        description: "The test image digest. Empty unless enable-upload-test-image is set, since the test image is only exported then."
+        value: ${{ jobs.merge.outputs.test-image-digest }}
+        description: "The digest of the test image in the `<image-slug>-test` artifact. Empty unless enable-upload-test-image is set, since the test image is only exported then."
       test-image-version:
-        value: ${{ jobs.build.outputs.test-image-version }}
+        value: ${{ jobs.prepare.outputs.test-image-version }}
         description: "The built image version"
       image-slug:
-        value: ${{ jobs.build.outputs.image-slug }}
+        value: ${{ jobs.prepare.outputs.image-slug }}
         description: "The name of the build image in slugified form. This is the name of the artifact where the image was uploaded to."
     secrets:
       github-token:
@@ -118,27 +126,108 @@ on:
         required: false
 
 jobs:
-  build:
-    name: build image
+  # Everything the per-platform build jobs have to agree on: which platforms
+  # are built on which runner, and the image's tags and labels - the labels
+  # include the build time, so generating them per platform would yield
+  # different ones for each.
+  prepare:
+    name: prepare build
     runs-on: ubuntu-26.04
     permissions:
       contents: read
-      packages: write # to push the image to ghcr.io
-      pull-requests: write # for the trivy PR comment
     outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+      primary-platform: ${{ steps.platforms.outputs.primary-platform }}
       image-version: ${{ steps.image_meta.outputs.version }}
       image-tags: ${{ steps.image_meta.outputs.tags }}
+      image-labels: ${{ steps.image_meta.outputs.labels }}
       image-meta-json: ${{ steps.image_meta.outputs.json }}
-      image-digest: ${{ steps.image_digest.outputs.digest }}
       test-image-version: ${{ steps.tests_image_meta.outputs.version }}
       test-image-tags: ${{ steps.tests_image_meta.outputs.tags }}
+      test-image-labels: ${{ steps.tests_image_meta.outputs.labels }}
       test-image-meta-json: ${{ steps.tests_image_meta.outputs.json }}
-      test-image-digest: ${{ steps.build_test.outputs.digest }}
       image-slug: ${{ steps.slugify-image.outputs.slug }}
-    env:
-      # false only for pull requests from forks: their token is read-only and they
-      # get no secrets, so nothing can be pushed to the registry or commented.
-      CAN_WRITE: ${{ github.event_name != 'pull_request' || github.event.pull_request.base.repo.full_name == github.event.pull_request.head.repo.full_name }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
+      # One matrix entry per platform. The "primary" platform is the one whose image is
+      # uploaded as the `<image-slug>` artifact and scanned by trivy: linux/amd64 if it is
+      # built, since that is what the jobs consuming the artifact usually run on.
+      - name: Determine build matrix
+        id: platforms
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+          PLATFORM_RUNNERS: ${{ inputs.platform-runners }}
+        run: |
+          matrix="$(
+            jq --null-input --compact-output \
+              --arg platforms "${PLATFORMS}" \
+              --argjson runners "${PLATFORM_RUNNERS}" '
+                [$platforms | splits("[,\\s]+") | select(length > 0)]
+                | reduce .[] as $platform ([]; if index($platform) then . else . + [$platform] end)
+                | (if index("linux/amd64") then "linux/amd64" else .[0] end) as $primary
+                | map({
+                    platform: .,
+                    slug: gsub("/"; "-"),
+                    runner: ($runners[.] // "ubuntu-26.04"),
+                    primary: (. == $primary)
+                  })
+              '
+          )"
+          if [ "$(jq 'length' <<<"${matrix}")" = "0" ]; then
+            echo "::error::the platforms input doesn't contain any platform"
+            exit 1
+          fi
+          echo "build matrix: ${matrix}"
+          {
+            echo "matrix=${matrix}"
+            echo "primary-platform=$(jq -r '.[] | select(.primary) | .platform' <<<"${matrix}")"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Container image meta
+        id: image_meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: |
+            ${{ inputs.image }}
+          tags: |
+            ${{ inputs.image-tags }}
+
+      - name: Container meta for the test image
+        id: tests_image_meta
+        if: ${{ inputs.enable-build-test-layer == true }}
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: |
+            ${{ inputs.image }}-test
+
+      - uses: rlespinasse/slugify-value@f13019fcc1d95a391d12b618028b003adf29ebca # v1.4.1
+        id: slugify-image
+        with:
+          key: BUILD_IMAGE
+          value: ${{ steps.image_meta.outputs.json && fromJson(steps.image_meta.outputs.json).tags[0] }}
+          publish-env: false
+          slug-maxlength: nolimit
+
+  # Builds one platform per job, each on a runner of that platform's architecture
+  # wherever the platform-runners input has one for it, instead of emulating the
+  # foreign platforms using QEMU. Each job pushes its image by digest only, without
+  # any tags: the merge job below combines them into the tagged, multi-platform image.
+  # <https://docs.docker.com/build/ci/github-actions/multi-platform/>
+  build:
+    name: build image (${{ matrix.platform }})
+    needs:
+      - prepare
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write # to push the image to ghcr.io
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
@@ -157,7 +246,9 @@ jobs:
           # zizmor: runtime artifacts potentially vulnerable to a cache poisoning attack
           cache-binary: false
 
+      # only for platforms the platform-runners input has no runner of the same architecture for
       - name: Set up QEMU
+        if: ${{ !((runner.arch == 'X64' && startsWith(matrix.platform, 'linux/amd64')) || (runner.arch == 'ARM64' && startsWith(matrix.platform, 'linux/arm64'))) }}
         uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
 
       - name: Free disk space
@@ -178,23 +269,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.github-token || github.token }}
 
-      - name: Container image meta
-        id: image_meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: |
-            ${{ inputs.image }}
-          tags: |
-            ${{ inputs.image-tags }}
-
-      - name: Container meta for the test image
-        id: tests_image_meta
-        if: ${{ inputs.enable-build-test-layer == true }}
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: |
-            ${{ inputs.image }}-test
-
       - name: Cache buildkit cache mounts
         id: buildkit-cache-mount
         if: ${{ inputs.enable-buildkit-cache-mount-caching }}
@@ -202,11 +276,14 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: buildkit-cache-mount
+          # one cache per platform: the build jobs run at the same time, and the contents of the
+          # cache mounts (e.g. downloaded packages) are specific to the platform they were built for.
+          #
           # falls back to the Dockerfile again rather than passing an empty pattern when no key files
           # are set. hashFiles hashes each matched file once, so those callers keep their current key.
-          key: buildkit-cache-mount-${{ runner.os }}-${{ inputs.image }}-${{ hashFiles(format('{0}/Dockerfile', inputs.build-context), inputs.buildkit-cache-mount-key-files || format('{0}/Dockerfile', inputs.build-context)) }}
+          key: buildkit-cache-mount-${{ runner.os }}-${{ matrix.slug }}-${{ inputs.image }}-${{ hashFiles(format('{0}/Dockerfile', inputs.build-context), inputs.buildkit-cache-mount-key-files || format('{0}/Dockerfile', inputs.build-context)) }}
           restore-keys: |
-            buildkit-cache-mount-${{ runner.os }}-${{ inputs.image }}-
+            buildkit-cache-mount-${{ runner.os }}-${{ matrix.slug }}-${{ inputs.image }}-
 
       # restores the contents of any `RUN --mount=type=cache` mounts declared in the Dockerfile
       # into the builder before the build, and saves them back to the cache dir above afterwards
@@ -233,34 +310,27 @@ jobs:
           # would add over 30s to every build for an image nothing uses.
           load: ${{ inputs.enable-upload-test-image }}
           outputs: ${{ inputs.enable-upload-test-image && 'type=oci,dest=./image-test.tar,oci-mediatypes=true,compression=zstd,force-compression=true' || 'type=cacheonly' }}
-          tags: ${{ steps.tests_image_meta.outputs.tags }}
-          labels: ${{ steps.tests_image_meta.outputs.labels }}
+          tags: ${{ needs.prepare.outputs.test-image-tags }}
+          labels: ${{ needs.prepare.outputs.test-image-labels }}
           # a separate cache ref from the main image build below: both export to the
           # registry, so sharing one ref would let the main build's export replace
           # this one and the layers only the test stage uses would never be cached.
+          # The same goes for the platforms, so each of them has its own cache refs.
           #
           # the cache export must use the same compression as the outputs: exporting a
           # gzip cache (the default) of force-compressed zstd layers makes BuildKit's
           # memory balloon until it is OOM-killed ("error reading from server: EOF").
-          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache-test', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache-test,mode=max,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache-test-{1}', inputs.image, matrix.slug) || '' }} # zizmor: ignore[template-injection]
+          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache-test-{1},mode=max,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image, matrix.slug) || '' }} # zizmor: ignore[template-injection]
           target: test
-          platforms: ${{ inputs.platforms }}
+          platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build-args }}
-
-      - uses: rlespinasse/slugify-value@f13019fcc1d95a391d12b618028b003adf29ebca # v1.4.1
-        id: slugify-image
-        with:
-          key: BUILD_IMAGE
-          value: ${{ steps.image_meta.outputs.json && fromJson(steps.image_meta.outputs.json).tags[0] }}
-          publish-env: false
-          slug-maxlength: nolimit
 
       - name: Upload test image
         if: ${{ (inputs.enable-build-test-layer == true) && (inputs.enable-upload-test-image == true) }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ steps.slugify-image.outputs.slug }}-test
+          name: ${{ needs.prepare.outputs.image-slug }}-test${{ !matrix.primary && format('-{0}', matrix.slug) || '' }}
           path: |
             ${{ github.workspace }}/image-test.tar
 
@@ -271,29 +341,32 @@ jobs:
           context: ${{ inputs.build-context }} # zizmor: ignore[template-injection]
           # when in a PR, save the image as a tar archive
           # this way, we can save it as an artifact in later steps
-          # otherwise (on branch-push or releases), push the image to
-          # the registry
+          # (when it can be, the image is pushed to the registry as well)
           #
-          # the registry push is expressed as a second `outputs` entry rather
-          # than the `push` input: buildx's `--push` shorthand creates its own
-          # implicit output that does not inherit the compression settings of
+          # the registry push is expressed as an `outputs` entry rather than the
+          # `push` input: buildx's `--push` shorthand creates its own implicit
+          # output that does not inherit the compression settings of
           # explicitly-specified outputs, silently falling back to gzip.
-          load: ${{ github.event_name == 'pull_request' }}
+          #
+          # the image is pushed by digest only: the merge job creates the tags, pointing
+          # them at the images of all platforms. That is also why there is no `tags` input:
+          # it would overwrite the `name` of every output, and an image can't be pushed by
+          # digest under a tagged name. The tarball is named after the tags instead, so
+          # that loading it results in an image that has them.
           outputs: |
-            type=oci,dest=./image.tar,oci-mediatypes=true,compression=zstd,force-compression=true
-            ${{ env.CAN_WRITE == 'true' && 'type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true' || '' }}
+            ${{ github.event_name == 'pull_request' && format('type=oci,dest=./image.tar,"name={0}",oci-mediatypes=true,compression=zstd,force-compression=true', join(fromJson(needs.prepare.outputs.image-meta-json).tags, ',')) || '' }}
+            ${{ env.CAN_WRITE == 'true' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image) || '' }}
           sbom: ${{ github.event_name != 'pull_request' }}
           # mode=max records the complete build definition (LLB, Dockerfile, source
           # maps) instead of just the materials and source revision, but that also
           # includes the value of every build-arg - see the build-args input.
           # <https://docs.docker.com/build/metadata/attestations/slsa-provenance/>
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || false }}
-          tags: ${{ steps.image_meta.outputs.tags }}
-          labels: ${{ steps.image_meta.outputs.labels }}
-          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache', inputs.image) || '' }} # zizmor: ignore[template-injection]
+          labels: ${{ needs.prepare.outputs.image-labels }}
+          cache-from: ${{ inputs.enable-build-cache && format('type=registry,ref={0}:buildcache-{1}', inputs.image, matrix.slug) || '' }} # zizmor: ignore[template-injection]
           # same compression as the outputs - see the cache-to comment of the test layer build
-          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache,mode=max,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image) || '' }} # zizmor: ignore[template-injection]
-          platforms: ${{ inputs.platforms }}
+          cache-to: ${{ inputs.enable-build-cache && env.CAN_WRITE == 'true' && format('type=registry,ref={0}:buildcache-{1},mode=max,oci-mediatypes=true,compression=zstd,force-compression=true', inputs.image, matrix.slug) || '' }} # zizmor: ignore[template-injection]
+          platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build-args }}
 
       # a crashed BuildKit daemon only shows up as "error reading from server: EOF"
@@ -308,36 +381,180 @@ jobs:
           sudo dmesg | grep -i -E 'out of memory|oom-kill|killed process' | tail -n 5 || true
           docker logs --tail 300 "${BUILDKIT_CONTAINER}" 2>&1 || true
 
-      # the build step's own `digest` output can't be used as the image digest: with more than one
-      # exporter, buildx reports only one of their digests, and on pull requests that is the one of
-      # the image loaded into the local Docker daemon. `load` creates its own implicit exporter that
-      # does not inherit the compression and media types of the explicit outputs, so its manifest -
-      # and digest - differs from the pushed one, and the reported digest doesn't exist in the
-      # registry. The OCI tarball is exported with the exact same settings as the registry push
-      # (including the attestations on non-PR builds), so its digest is the one of the pushed image.
+      # the digest of this platform's image, for the merge job to reference it by. A matrix job
+      # can't pass it on as a job output - all of its jobs would write to the same one - so it is
+      # handed over as an artifact.
+      #
+      # On pull requests the build has up to two outputs, of which buildx reports only one digest.
+      # Both are exported with the exact same settings, so the digest of the image in the tarball
+      # is the one of the pushed image, too. Everywhere else the registry push is the only output,
+      # and its digest the one the build step reports. A tarball's digest couldn't be used there:
+      # the attestations of non-PR builds contain the image's name, which is different for the
+      # tarball (named after the tags) and the push (by digest), so their digests would differ.
       - name: Determine image digest
-        id: image_digest
         env:
           IMAGE_TAR: ${{ github.workspace }}/image.tar
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          TEST_IMAGE_DIGEST: ${{ steps.build_test.outputs.digest }}
+          PLATFORM: ${{ matrix.platform }}
+          DIGEST_FILE: ${{ runner.temp }}/digests/${{ matrix.slug }}.json
         run: |
-          index="$(tar -xOf "${IMAGE_TAR}" index.json)"
-          # the index contains one entry per tag, all referencing the same manifest
-          digests="$(jq -r '[.manifests[].digest] | unique | .[]' <<<"${index}")"
-          if [ "$(wc -l <<<"${digests}")" != "1" ] || [ -z "${digests}" ]; then
-            echo "::error::expected exactly one manifest digest in the OCI tarball's index.json, got: ${index}"
+          if [ -f "${IMAGE_TAR}" ]; then
+            index="$(tar -xOf "${IMAGE_TAR}" index.json)"
+            # the index contains one entry per tag, all referencing the same manifest
+            digest="$(jq -r '[.manifests[].digest] | unique | .[]' <<<"${index}")"
+          else
+            digest="${BUILD_DIGEST}"
+          fi
+          if ! [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::expected exactly one image digest for ${PLATFORM}, got: '${digest}'"
             exit 1
           fi
-          digest="${digests}"
-          echo "image digest: ${digest}"
-          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "image digest for ${PLATFORM}: ${digest}"
+          mkdir -p "$(dirname "${DIGEST_FILE}")"
+          jq --null-input \
+            --arg platform "${PLATFORM}" \
+            --arg digest "${digest}" \
+            --arg testDigest "${TEST_IMAGE_DIGEST}" \
+            '{platform: $platform, digest: $digest, "test-digest": $testDigest}' > "${DIGEST_FILE}"
 
-      - name: Upload container image
-        if: ${{ github.event_name == 'pull_request' && inputs.enable-upload-image == true }}
+      - name: Upload image digest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ steps.slugify-image.outputs.slug }}
+          name: ${{ needs.prepare.outputs.image-slug }}-digests-${{ matrix.slug }}
+          path: ${{ runner.temp }}/digests/${{ matrix.slug }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+      # on pull requests from forks the primary platform's image is uploaded even if
+      # enable-upload-image is disabled: nothing is pushed to the registry there, so
+      # the artifact is the only way for the merge job to get at the image to scan.
+      - name: Upload container image
+        if: ${{ github.event_name == 'pull_request' && (inputs.enable-upload-image == true || (matrix.primary && env.CAN_WRITE != 'true')) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ needs.prepare.outputs.image-slug }}${{ !matrix.primary && format('-{0}', matrix.slug) || '' }}
           path: |
             ${{ github.workspace }}/image.tar
+
+      - name: display images
+        run: |
+          docker image ls -a
+
+  # Combines the per-platform images into one multi-platform image, which is the one
+  # that gets the tags, and scans it.
+  merge:
+    name: merge and scan image
+    runs-on: ubuntu-26.04
+    needs:
+      - prepare
+      - build
+    permissions:
+      contents: read
+      packages: write # to push the image tags to ghcr.io
+      pull-requests: write # for the trivy PR comment
+    outputs:
+      image-digest: ${{ steps.image_digest.outputs.digest }}
+      test-image-digest: ${{ steps.image_digest.outputs.test-digest }}
+    env:
+      # scan the same platform on every kind of build: without this, trivy picks the runner's
+      # platform for images in the registry, and fails if the image wasn't built for it.
+      TRIVY_PLATFORM: ${{ needs.prepare.outputs.primary-platform }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # change to 'egress-policy: block' after couple of runs
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          # zizmor: runtime artifacts potentially vulnerable to a cache poisoning attack
+          cache-binary: false
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: ${{ env.CAN_WRITE == 'true' }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.github-token || github.token }}
+
+      - name: Download image digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ${{ needs.prepare.outputs.image-slug }}-digests-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      # the image-digest output is used to sign the image and to pin it by digest, e.g. in Helm
+      # charts, so it must be the one of the image the tags point to: it is taken from the result
+      # of creating them, rather than by resolving a tag that another run could have moved since.
+      #
+      # `--prefer-index=false` keeps the image of a single-platform build as it was pushed instead
+      # of wrapping it in another index, which would only change its digest.
+      - name: Create multi-platform image and push tags
+        id: image_digest
+        env:
+          IMAGE: ${{ inputs.image }}
+          TAGS: ${{ needs.prepare.outputs.image-tags }}
+          MATRIX: ${{ needs.prepare.outputs.matrix }}
+          DIGESTS_DIR: ${{ runner.temp }}/digests
+          METADATA_FILE: ${{ runner.temp }}/image-metadata.json
+        run: |
+          primary_slug="$(jq -r '.[] | select(.primary) | .slug' <<<"${MATRIX}")"
+          test_digest="$(jq -r '."test-digest"' "${DIGESTS_DIR}/${primary_slug}.json")"
+
+          if [ "${CAN_WRITE}" = "true" ]; then
+            # in the order of the platforms input, so the same build always results in the same index
+            platform_slugs="$(jq -r '.[].slug' <<<"${MATRIX}")"
+            sources=()
+            for platform_slug in ${platform_slugs}; do
+              platform_digest="$(jq -er '.digest' "${DIGESTS_DIR}/${platform_slug}.json")"
+              sources+=("${IMAGE}@${platform_digest}")
+            done
+
+            tag_args=()
+            while IFS= read -r tag; do
+              if [ -n "${tag}" ]; then
+                tag_args+=(--tag "${tag}")
+              fi
+            done <<<"${TAGS}"
+
+            docker buildx imagetools create \
+              --prefer-index=false \
+              --metadata-file "${METADATA_FILE}" \
+              "${tag_args[@]}" \
+              "${sources[@]}"
+            digest="$(jq -er '."containerimage.descriptor".digest' "${METADATA_FILE}")"
+            docker buildx imagetools inspect "${IMAGE}@${digest}"
+          else
+            # nothing was pushed, so there is nothing to merge: the image only exists as the
+            # per-platform artifacts, of which the primary platform's is the one scanned below.
+            digest="$(jq -er '.digest' "${DIGESTS_DIR}/${primary_slug}.json")"
+          fi
+
+          echo "image digest: ${digest}"
+          {
+            echo "digest=${digest}"
+            echo "test-digest=${test_digest}"
+          } >> "${GITHUB_OUTPUT}"
+
+      # trivy looks for the image in the local Docker daemon before it tries the registry,
+      # which is where it finds it on every build other than pull requests from forks.
+      - name: Download container image
+        if: ${{ env.CAN_WRITE != 'true' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.prepare.outputs.image-slug }}
+          path: ${{ runner.temp }}/image
+
+      - name: Load container image
+        if: ${{ env.CAN_WRITE != 'true' }}
+        env:
+          IMAGE_TAR: ${{ runner.temp }}/image/image.tar
+        run: |
+          docker load --input "${IMAGE_TAR}"
 
       - name: display images
         run: |
@@ -352,9 +569,9 @@ jobs:
           TMPDIR: /tmp
         with:
           version: v${{ env.TRIVY_VERSION }}
-          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          image-ref: ${{ fromJson(needs.prepare.outputs.image-meta-json).tags[0] }}
           format: cyclonedx
-          output: ${{ steps.slugify-image.outputs.slug }}-sbom.cdx.json
+          output: ${{ needs.prepare.outputs.image-slug }}-sbom.cdx.json
 
       - name: Generate SPDX SBOM
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -363,17 +580,17 @@ jobs:
         with:
           skip-setup-trivy: true
           cache: false
-          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          image-ref: ${{ fromJson(needs.prepare.outputs.image-meta-json).tags[0] }}
           format: spdx-json
-          output: ${{ steps.slugify-image.outputs.slug }}-sbom.spdx.json
+          output: ${{ needs.prepare.outputs.image-slug }}-sbom.spdx.json
 
       - name: Upload SBOMs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ steps.slugify-image.outputs.slug }}-sboms
+          name: ${{ needs.prepare.outputs.image-slug }}-sboms
           path: |
-            ${{ steps.slugify-image.outputs.slug }}-sbom.cdx.json
-            ${{ steps.slugify-image.outputs.slug }}-sbom.spdx.json
+            ${{ needs.prepare.outputs.image-slug }}-sbom.cdx.json
+            ${{ needs.prepare.outputs.image-slug }}-sbom.spdx.json
 
       - name: Create Trivy vulnerability attestation
         if: ${{ inputs.enable-trivy-scan }}
@@ -384,7 +601,7 @@ jobs:
         with:
           skip-setup-trivy: true
           cache: false
-          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          image-ref: ${{ fromJson(needs.prepare.outputs.image-meta-json).tags[0] }}
           exit-code: "0"
           format: cosign-vuln
           output: trivy-vuln-attestation.json
@@ -394,7 +611,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ inputs.enable-trivy-scan }}
         with:
-          name: ${{ steps.slugify-image.outputs.slug }}-trivy-attestation
+          name: ${{ needs.prepare.outputs.image-slug }}-trivy-attestation
           path: |
             trivy-vuln-attestation.json
 
@@ -417,7 +634,7 @@ jobs:
         with:
           skip-setup-trivy: true
           cache: false
-          image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+          image-ref: ${{ fromJson(needs.prepare.outputs.image-meta-json).tags[0] }}
           exit-code: "0"
           format: template
           template: "@trivy-pr-report.md.tpl"
@@ -441,7 +658,7 @@ jobs:
         if: ${{ steps.pr-report-size.outputs.too-large == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ steps.slugify-image.outputs.slug }}-trivy-pr-report
+          name: ${{ needs.prepare.outputs.image-slug }}-trivy-pr-report
           path: trivy-pr-report.md
 
       - name: Replace the PR comment's detail tables with a link to the full report
@@ -463,7 +680,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && inputs.enable-trivy-scan && env.CAN_WRITE == 'true' }}
         with:
           recreate: true
-          header: "trivy-report-comment-${{ steps.slugify-image.outputs.slug }}"
+          header: "trivy-report-comment-${{ needs.prepare.outputs.image-slug }}"
           path: trivy-pr-report.md
 
     # requires content: write access
@@ -471,7 +688,7 @@ jobs:
     #     uses: aquasecurity/trivy-action@fbd16365eb88e12433951383f5e99bd901fc618f # 0.12.0
     #     if: ${{ github.event_name != 'pull_request' }}
     #     with:
-    #       image-ref: ${{ fromJson(steps.image_meta.outputs.json).tags[0] }}
+    #       image-ref: ${{ fromJson(needs.prepare.outputs.image-meta-json).tags[0] }}
     #       format: "github"
     #       output: "dependency-results.sbom.json"
     #       github-pat: ${{ secrets.github-token }}
@@ -499,9 +716,10 @@ jobs:
     runs-on: ubuntu-26.04
     if: ${{ github.event_name != 'pull_request' }}
     needs:
-      - build
+      - prepare
+      - merge
     concurrency:
-      group: attest-referrers-${{ inputs.image }}@${{ needs.build.outputs.image-digest }}
+      group: attest-referrers-${{ inputs.image }}@${{ needs.merge.outputs.image-digest }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -527,7 +745,7 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ inputs.image }}
-          subject-digest: ${{ needs.build.outputs.image-digest }}
+          subject-digest: ${{ needs.merge.outputs.image-digest }}
           push-to-registry: true
 
       - name: Install Cosign
@@ -535,7 +753,7 @@ jobs:
 
       - name: Sign image
         env:
-          IMAGE: "${{ inputs.image }}@${{ needs.build.outputs.image-digest }}"
+          IMAGE: "${{ inputs.image }}@${{ needs.merge.outputs.image-digest }}"
         run: |
           echo "Signing '$IMAGE' using keyless approach"
           cosign sign --yes "${IMAGE}"
@@ -544,13 +762,13 @@ jobs:
         if: ${{ inputs.enable-trivy-scan }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ needs.build.outputs.image-slug }}-trivy-attestation
+          name: ${{ needs.prepare.outputs.image-slug }}-trivy-attestation
           path: /tmp
 
       - name: Attest image vulnerability report
         if: ${{ inputs.enable-trivy-scan }}
         env:
-          IMAGE: "${{ inputs.image }}@${{ needs.build.outputs.image-digest }}"
+          IMAGE: "${{ inputs.image }}@${{ needs.merge.outputs.image-digest }}"
         run: |
           echo "Attest vulnerability report for '$IMAGE' using keyless approach"
           cosign attest --yes --type vuln --predicate /tmp/trivy-vuln-attestation.json "$IMAGE"
@@ -561,7 +779,8 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs:
       - attest-and-sign-image
-      - build
+      - prepare
+      - merge
     permissions:
       contents: write # to upload artifacts to the release
       attestations: read # for gh attestation download
@@ -574,9 +793,9 @@ jobs:
       - name: download attestation from image
         env:
           GH_TOKEN: ${{ secrets.github-token || github.token }}
-          IMAGE: "${{ inputs.image }}@${{ needs.build.outputs.image-digest }}"
-          IMAGE_DIGEST: "${{ needs.build.outputs.image-digest }}"
-          IMAGE_SLUG: "${{ needs.build.outputs.image-slug }}"
+          IMAGE: "${{ inputs.image }}@${{ needs.merge.outputs.image-digest }}"
+          IMAGE_DIGEST: "${{ needs.merge.outputs.image-digest }}"
+          IMAGE_SLUG: "${{ needs.prepare.outputs.image-slug }}"
           REPO: ${{ github.repository }}
         run: |
           gh attestation download "oci://${IMAGE}" \
@@ -596,7 +815,8 @@ jobs:
     runs-on: ubuntu-26.04
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs:
-      - build
+      - prepare
+      - merge
     permissions:
       contents: write # to upload artifacts to the release
     steps:
@@ -608,7 +828,7 @@ jobs:
       - name: Download sboms
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ needs.build.outputs.image-slug }}-sboms
+          name: ${{ needs.prepare.outputs.image-slug }}-sboms
           path: ./sboms
 
       - name: Display structure of downloaded files
