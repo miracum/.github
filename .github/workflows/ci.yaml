@@ -94,11 +94,25 @@ jobs:
       codeql-languages: '["python", "actions"]'
       enable-codeql: true
 
+  # runs the image on a runner of each of the platforms it was built for, to
+  # cover both the natively built images and the multi-platform image they are
+  # combined into.
   test:
-    runs-on: ubuntu-26.04
-    name: test
+    runs-on: ${{ matrix.runner }}
+    name: test (${{ matrix.platform }})
     needs:
       - build
+    strategy:
+      matrix:
+        include:
+          # standard-build.yaml uploads linux/amd64 as the artifacts named after the image-slug
+          # itself, and suffixes the artifacts of the other platforms with theirs.
+          - platform: linux/amd64
+            runner: ubuntu-26.04
+            artifact-suffix: ""
+          - platform: linux/arm64
+            runner: ubuntu-26.04-arm
+            artifact-suffix: -linux-arm64
     permissions:
       contents: read
       packages: read # to resolve the pushed image's digest in ghcr.io
@@ -127,19 +141,27 @@ jobs:
           # strip the tag, keeping a registry port's colon intact
           image_name="${IMAGE%:*}"
           docker buildx imagetools inspect "${image_name}@${IMAGE_DIGEST}"
+          # ... and must be the multi-platform image, not just one of its platforms
+          platforms="$(docker buildx imagetools inspect --format '{{json .Manifest}}' "${image_name}@${IMAGE_DIGEST}" |
+            jq -r '[.manifests[].platform | select(.os != "unknown") | "\(.os)/\(.architecture)"] | sort | join(",")')"
+          echo "platforms: ${platforms}"
+          if [ "${platforms}" != "linux/amd64,linux/arm64" ]; then
+            echo "::error::expected ${image_name}@${IMAGE_DIGEST} to be built for linux/amd64 and linux/arm64"
+            exit 1
+          fi
 
       - name: Download build image
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: ${{ github.event_name == 'pull_request' }}
         with:
-          name: ${{ needs.build.outputs.image-slug }}
+          name: ${{ needs.build.outputs.image-slug }}${{ matrix.artifact-suffix }}
           path: /tmp
 
       - name: Download test image
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: ${{ github.event_name == 'pull_request' }}
         with:
-          name: ${{ needs.build.outputs.image-slug }}-test
+          name: ${{ needs.build.outputs.image-slug }}-test${{ matrix.artifact-suffix }}
           path: /tmp
 
       - name: ls
@@ -160,9 +182,17 @@ jobs:
         env:
           # on pull requests this is the image loaded above, otherwise it's pulled from the registry
           IMAGE: ${{ fromJson(needs.build.outputs.image-meta-json).tags[0] }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           output="$(docker run --rm "${IMAGE}")"
           echo "${output}"
+          # it must have run natively, as the image built for this runner's platform
+          image_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "${IMAGE}")"
+          echo "image platform: ${image_platform}"
+          if [ "${image_platform}" != "${PLATFORM}" ]; then
+            echo "::error::expected ${IMAGE} to be a ${PLATFORM} image"
+            exit 1
+          fi
           if [ "${output}" != "Hello World!" ]; then
             echo "::error::unexpected output from ${IMAGE}"
             exit 1
