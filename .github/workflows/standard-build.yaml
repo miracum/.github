@@ -149,7 +149,7 @@ jobs:
       image-slug: ${{ steps.slugify-image.outputs.slug }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit # change to 'egress-policy: block' after couple of runs
 
@@ -230,7 +230,7 @@ jobs:
       packages: write # to push the image to ghcr.io
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit # change to 'egress-policy: block' after couple of runs
 
@@ -241,7 +241,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: setup-buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           # zizmor: runtime artifacts potentially vulnerable to a cache poisoning attack
           cache-binary: false
@@ -249,11 +249,11 @@ jobs:
       # only for platforms the platform-runners input has no runner of the same architecture for
       - name: Set up QEMU
         if: ${{ !((runner.arch == 'X64' && startsWith(matrix.platform, 'linux/amd64')) || (runner.arch == 'ARM64' && startsWith(matrix.platform, 'linux/arm64'))) }}
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Free disk space
         if: ${{ inputs.free-disk-space }}
-        uses: endersonmenezes/free-disk-space@2a22f8c59cae9cddae7194b33e6b92d023b2b4b8 # v4.0.0
+        uses: endersonmenezes/free-disk-space@8b8cd4e2277836962939a8f3b4ea0ee4bc006156 # v4.0.1
         with:
           remove_android: true
           remove_dotnet: true
@@ -262,7 +262,7 @@ jobs:
           rm_cmd: "rmz"
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         if: ${{ env.CAN_WRITE == 'true' }}
         with:
           registry: ghcr.io
@@ -301,7 +301,7 @@ jobs:
       - name: Build unit test image layer
         if: ${{ inputs.enable-build-test-layer == true }}
         id: build_test
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ inputs.build-context }} # zizmor: ignore[template-injection]
           push: false
@@ -328,7 +328,7 @@ jobs:
 
       - name: Upload test image
         if: ${{ (inputs.enable-build-test-layer == true) && (inputs.enable-upload-test-image == true) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-test${{ !matrix.primary && format('-{0}', matrix.slug) || '' }}
           path: |
@@ -336,7 +336,7 @@ jobs:
 
       - name: Build and push image
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ inputs.build-context }} # zizmor: ignore[template-injection]
           # when in a PR, save the image as a tar archive
@@ -419,7 +419,7 @@ jobs:
             '{platform: $platform, digest: $digest, "test-digest": $testDigest}' > "${DIGEST_FILE}"
 
       - name: Upload image digest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-digests-${{ matrix.slug }}
           path: ${{ runner.temp }}/digests/${{ matrix.slug }}.json
@@ -431,7 +431,7 @@ jobs:
       # the artifact is the only way for the merge job to get at the image to scan.
       - name: Upload container image
         if: ${{ github.event_name == 'pull_request' && (inputs.enable-upload-image == true || (matrix.primary && env.CAN_WRITE != 'true')) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}${{ !matrix.primary && format('-{0}', matrix.slug) || '' }}
           path: |
@@ -462,18 +462,18 @@ jobs:
       TRIVY_PLATFORM: ${{ needs.prepare.outputs.primary-platform }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit # change to 'egress-policy: block' after couple of runs
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           # zizmor: runtime artifacts potentially vulnerable to a cache poisoning attack
           cache-binary: false
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         if: ${{ env.CAN_WRITE == 'true' }}
         with:
           registry: ghcr.io
@@ -481,7 +481,7 @@ jobs:
           password: ${{ secrets.github-token || github.token }}
 
       - name: Download image digests
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: ${{ needs.prepare.outputs.image-slug }}-digests-*
           path: ${{ runner.temp }}/digests
@@ -544,7 +544,7 @@ jobs:
       # which is where it finds it on every build other than pull requests from forks.
       - name: Download container image
         if: ${{ env.CAN_WRITE != 'true' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}
           path: ${{ runner.temp }}/image
@@ -585,7 +585,7 @@ jobs:
           output: ${{ needs.prepare.outputs.image-slug }}-sbom.spdx.json
 
       - name: Upload SBOMs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-sboms
           path: |
@@ -608,7 +608,7 @@ jobs:
           ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Upload image vulnerability attestation
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ inputs.enable-trivy-scan }}
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-trivy-attestation
@@ -656,7 +656,7 @@ jobs:
       - name: Upload full trivy report
         id: upload-pr-report
         if: ${{ steps.pr-report-size.outputs.too-large == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-trivy-pr-report
           path: trivy-pr-report.md
@@ -729,12 +729,12 @@ jobs:
       packages: write # for pushing the signature and attestations to ghcr.io.
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit # change to 'egress-policy: block' after couple of runs
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -760,7 +760,7 @@ jobs:
 
       - name: Download trivy attestation
         if: ${{ inputs.enable-trivy-scan }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-trivy-attestation
           path: /tmp
@@ -786,7 +786,7 @@ jobs:
       attestations: read # for gh attestation download
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit # change to 'egress-policy: block' after couple of runs
 
@@ -821,12 +821,12 @@ jobs:
       contents: write # to upload artifacts to the release
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit # change to 'egress-policy: block' after couple of runs
 
       - name: Download sboms
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ needs.prepare.outputs.image-slug }}-sboms
           path: ./sboms
